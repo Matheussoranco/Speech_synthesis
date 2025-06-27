@@ -1,0 +1,16 @@
+# Main requirements for speech synthesis and voice cloning
+numpy
+scipy
+torch
+torchaudio
+transformers
+librosa
+soundfile
+pydub
+matplotlib
+jupyter
+# For web demo (optional)
+streamlit
+# For model management
+omegaconf
+tqdm

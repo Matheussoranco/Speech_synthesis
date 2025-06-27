@@ -1,0 +1,17 @@
+# Example config for training a TTS model
+model:
+  type: "YourTTS"  # or "ChatterboxTTS"
+  params:
+    hidden_size: 256
+    num_layers: 4
+    speaker_embedding: true
+    # ...
+data:
+  train_path: "data/train/"
+  val_path: "data/val/"
+  sample_rate: 22050
+training:
+  batch_size: 32
+  epochs: 100
+  lr: 0.0003
+  save_every: 5
