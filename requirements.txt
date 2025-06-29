@@ -1,3 +1,4 @@
+
 # Main requirements for speech synthesis and voice cloning
 numpy
 scipy
@@ -9,8 +10,13 @@ soundfile
 pydub
 matplotlib
 jupyter
-# For web demo (optional)
-streamlit
-# For model management
 omegaconf
 tqdm
+# TTS and vocoder
+TTS  # Coqui TTS (Tacotron2, YourTTS, HiFi-GAN, etc.)
+phonemizer
+# Speaker encoder
+resemblyzer
+# Web demo
+streamlit
+gradio
