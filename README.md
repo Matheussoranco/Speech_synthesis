@@ -1,4 +1,4 @@
-# 🎤 Advanced Speech Synthesis System
+# Advanced Speech Synthesis System
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org)
@@ -6,23 +6,23 @@
 
 Uma solução avançada e completa para síntese de fala (Text-to-Speech) e clonagem de voz, construída com tecnologias de ponta em deep learning.
 
-## ✨ Características Principais
+## Características Principais
 
-### 🎯 Funcionalidades Core
+### Funcionalidades Core
 - **Síntese de Fala de Alta Qualidade**: Modelos TTS state-of-the-art (YourTTS, Tacotron2, FastSpeech2)
 - **Clonagem de Voz**: Clone qualquer voz com apenas 3-10 segundos de áudio
 - **Suporte Multi-idiomas**: Inglês, Espanhol, Francês, Alemão e mais
 - **Interface Web Moderna**: Interface Gradio intuitiva e responsiva
 - **API REST**: Endpoints para integração em aplicações
 
-### 🚀 Melhorias Técnicas
+### Melhorias Técnicas
 - **Arquitetura Transformer Avançada**: Implementação própria com attention multi-head
 - **Sistema de Treinamento Robusto**: Early stopping, gradient clipping, mixed precision
 - **Processamento de Texto Inteligente**: Normalização automática, fonemização
 - **Cache e Otimizações**: Sistema de cache para inferência rápida
 - **Monitoramento Completo**: Logs estruturados, métricas de performance
 
-### 🔧 Funcionalidades Técnicas
+### Funcionalidades Técnicas
 - **Múltiplas Arquiteturas**: YourTTS, Tacotron2, FastSpeech2, VITS
 - **Vocoders Neurais**: HiFi-GAN, MelGAN, WaveRNN
 - **Suporte a GPU**: CUDA, MPS (Apple Silicon), CPU
@@ -32,21 +32,19 @@ Uma solução avançada e completa para síntese de fala (Text-to-Speech) e clon
 - **Pré-processamento Inteligente**: Suporte a múltiplos formatos de dataset
 - **Export para Produção**: ONNX, TorchScript, Mobile, Quantização
 
-## 🆕 Novas Funcionalidades
-
-### 📊 Sistema de Avaliação
+### Sistema de Avaliação
 - **Métricas de Qualidade**: PESQ, STOI, SNR, distorção espectral
 - **Benchmark de Performance**: Medição de velocidade de inferência (RTF)
 - **Comparação de Modelos**: Avaliação side-by-side
 - **Relatórios Automatizados**: Geração de relatórios JSON detalhados
 
-### 🔧 Pré-processamento Avançado
+### Pré-processamento Avançado
 - **Detecção Automática de Formato**: LJSpeech, Common Voice, VCTK, genérico
 - **Normalização de Áudio**: Reamostragem, normalização de volume
 - **Criação de Espectrogramas**: Mel-spectrograms pré-computados
 - **Divisão Inteligente**: Train/validation/test splits configuráveis
 
-### 📦 Export para Produção
+### Export para Produção
 - **Múltiplos Formatos**: TorchScript, ONNX, Mobile, Quantizado
 - **Pacotes de Deploy**: Criação automática de pacotes completos
 - **Scripts de Inferência**: Scripts prontos para produção
@@ -85,7 +83,7 @@ Speech_synthesis/
 └── 📖 README.md                    # Esta documentação
 ```
 
-## 🚀 Instalação Rápida
+## Instalação Rápida
 
 ### Pré-requisitos
 - Python 3.8+ 
@@ -130,7 +128,7 @@ pip install -e ".[dev]"
 pre-commit install
 ```
 
-## 💻 Uso Rápido
+## Uso Rápido
 
 ### Interface Web (Recomendado)
 
@@ -253,7 +251,7 @@ python main.py train \
     --resume outputs/checkpoint_epoch_10.pth
 ```
 
-## ⚙️ Configuração Avançada
+## Configuração Avançada
 
 ### Arquivo de Configuração Principal
 
@@ -306,7 +304,7 @@ performance:
   batch_inference: true      # Inferência em lotes
 ```
 
-## 🎯 Exemplos de Uso
+## Exemplos de Uso
 
 ### Python API
 
@@ -354,7 +352,7 @@ for i, text in enumerate(texts):
     print(f"Salvo: {output_path}")
 ```
 
-## 🔬 Treinamento Personalizado
+## Treinamento Personalizado
 
 ### Preparação dos Dados
 
@@ -408,7 +406,7 @@ wandb login
 # O treinamento irá automaticamente logar métricas
 ```
 
-## 🧪 Testes e Qualidade
+## Testes e Qualidade
 
 ### Executar Testes
 
@@ -436,7 +434,7 @@ mypy src/
 pre-commit run --all-files
 ```
 
-## 📊 Métricas e Avaliação
+## Métricas e Avaliação
 
 ### Métricas de Qualidade de Áudio
 - **MOS (Mean Opinion Score)**: Avaliação subjetiva
@@ -513,7 +511,7 @@ python main.py infer \
     --log-level DEBUG
 ```
 
-## 🤝 Contribuição
+## Contribuição
 
 ### Como Contribuir
 
@@ -555,15 +553,6 @@ def nova_funcionalidade(texto: str, parametro: int = 10) -> str:
     return resultado
 ```
 
-## 📈 Roadmap
-
-### Versão 1.0 (Atual)
-- ✅ Interface Gradio moderna
-- ✅ Modelos TTS avançados
-- ✅ Sistema de clonagem de voz
-- ✅ Treinamento robusto
-- ✅ Processamento de texto inteligente
-
 ### Versão 1.1 (Próxima)
 - 🔄 API REST completa
 - 🔄 Suporte a mais idiomas
@@ -582,22 +571,10 @@ def nova_funcionalidade(texto: str, parametro: int = 10) -> str:
 
 Este projeto está licenciado sob a Licença MIT. Veja o arquivo [LICENSE](LICENSE) para detalhes.
 
-## 🙏 Agradecimentos
+## Agradecimentos
 
 - **Coqui TTS**: Framework base para TTS
 - **Resemblyzer**: Speaker encoder
 - **Gradio**: Interface web moderna
 - **PyTorch**: Framework de deep learning
 - **Comunidade Open Source**: Inspiração e suporte
-
-## 📞 Suporte
-
-- **Issues**: [GitHub Issues](../../issues)
-- **Documentação**: Este README e código comentado
-- **Exemplos**: Pasta `notebooks/`
-
----
-
-**Desenvolvido com ❤️ para a comunidade de síntese de fala**
-
-*Última atualização: Julho 2025*
