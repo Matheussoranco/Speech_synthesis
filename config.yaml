@@ -1,17 +1,115 @@
-# Example config for training a TTS model
+# Advanced configuration for Speech Synthesis system
+system:
+  device: "auto"  # auto, cpu, cuda, mps
+  cache_dir: "./cache"
+  log_level: "INFO"
+  max_workers: 4
+
+# Model configuration
 model:
-  type: "YourTTS"  # or "ChatterboxTTS"
+  type: "YourTTS"  # YourTTS, Tacotron2, FastSpeech2, VITS
+  checkpoint_path: null  # Path to pretrained model
+  config_path: null      # Path to model config
   params:
-    hidden_size: 256
-    num_layers: 4
+    hidden_size: 512
+    num_layers: 6
+    attention_heads: 8
+    dropout: 0.1
     speaker_embedding: true
-    # ...
+    speaker_embedding_dim: 256
+    use_phonemes: true
+    language: "en"
+    max_decoder_steps: 1000
+    gate_threshold: 0.5
+
+# Vocoder configuration
+vocoder:
+  type: "hifigan"  # hifigan, melgan, wavernn
+  checkpoint_path: null
+  config_path: null
+
+# Data configuration
 data:
   train_path: "data/train/"
   val_path: "data/val/"
+  test_path: "data/test/"
   sample_rate: 22050
+  hop_length: 256
+  win_length: 1024
+  n_mel_channels: 80
+  mel_fmin: 0
+  mel_fmax: 8000
+  preprocess_text: true
+  normalize_audio: true
+  trim_silence: true
+
+# Training configuration
 training:
-  batch_size: 32
+  batch_size: 16
   epochs: 100
-  lr: 0.0003
+  learning_rate: 0.0003
+  weight_decay: 1e-6
+  grad_clip_norm: 1.0
   save_every: 5
+  validate_every: 1
+  early_stopping_patience: 20
+  scheduler:
+    type: "ExponentialLR"
+    gamma: 0.95
+
+# Voice cloning configuration
+voice_cloning:
+  reference_encoder: "resemblyzer"  # resemblyzer, wav2vec2
+  min_reference_length: 3.0  # seconds
+  max_reference_length: 10.0
+  similarity_threshold: 0.7
+  embedding_cache: true
+
+# Text processing
+text_processing:
+  language: "en"
+  use_phonemes: true
+  phoneme_backend: "espeak"  # espeak, festival
+  add_blank: true
+  normalize_numbers: true
+  normalize_abbreviations: true
+  
+# Audio processing
+audio:
+  trim_silence: true
+  normalize: true
+  noise_reduction: false
+  speed_perturbation: false
+  pitch_shift: false
+
+# Web interface
+web:
+  title: "Advanced Speech Synthesis"
+  description: "High-quality text-to-speech and voice cloning"
+  max_text_length: 1000
+  max_audio_duration: 30  # seconds
+  enable_voice_cloning: true
+  enable_multi_speaker: true
+  
+# API configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  max_request_size: 10485760  # 10MB
+  request_timeout: 300
+
+# Monitoring
+monitoring:
+  enable_wandb: false
+  wandb_project: "speech-synthesis"
+  enable_tensorboard: true
+  tensorboard_log_dir: "./logs"
+
+# Performance
+performance:
+  enable_fp16: false
+  enable_caching: true
+  cache_size: 1000
+  batch_inference: true
+  max_batch_size: 8

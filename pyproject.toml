@@ -1,0 +1,78 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "speech-synthesis"
+version = "0.2.0"
+description = "Advanced Speech Synthesis and Voice Cloning System"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Speech Synthesis Team"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.21.0",
+    "torch>=1.12.0",
+    "torchaudio>=0.12.0",
+    "TTS>=0.22.0",
+    "transformers>=4.20.0",
+    "librosa>=0.9.0",
+    "soundfile>=0.10.0",
+    "omegaconf>=2.2.0",
+    "gradio>=3.40.0",
+    "fastapi>=0.95.0",
+    "loguru>=0.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+]
+web = [
+    "streamlit>=1.28.0",
+    "gradio>=3.40.0",
+    "fastapi>=0.95.0",
+    "uvicorn>=0.20.0",
+]
+monitoring = [
+    "wandb>=0.15.0",
+    "tensorboard>=2.12.0",
+]
+
+[project.scripts]
+speech-synthesis = "main:main"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--cov=src --cov-report=html --cov-report=term-missing"

@@ -1,0 +1,304 @@
+{
+    "version": "2.0.0",
+    "inputs": [
+        {
+            "id": "testModule",
+            "description": "Test module name (without test_ prefix)",
+            "default": "model",
+            "type": "promptString"
+        }
+    ],
+    "tasks": [
+        {
+            "label": "Launch Speech Synthesis Web Interface",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "web"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "Install Dependencies",
+            "type": "shell",
+            "command": "pip",
+            "args": ["install", "-r", "requirements.txt"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Run Setup Script",
+            "type": "shell",
+            "command": "python",
+            "args": ["setup.py"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "dependsOn": "Install Dependencies"
+        },
+        {
+            "label": "Run Examples",
+            "type": "shell",
+            "command": "python",
+            "args": ["examples.py"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Train Model",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "train", "--config", "config.yaml"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "isBackground": true
+        },
+        {
+            "label": "Test TTS Synthesis",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "infer", "--text", "Hello, this is a test of the speech synthesis system.", "--output", "test_output.wav"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Evaluate Model",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "evaluate", "--benchmark", "--repetitions", "5"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Preprocess Dataset",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "preprocess", "--input-dir", "data/raw", "--output-dir", "data/processed", "--format", "auto"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Export Model (TorchScript)",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "export", "--model-path", "models/checkpoint.pt", "--output", "exports/model.pt", "--format", "torchscript"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Export Model (ONNX)",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "export", "--model-path", "models/checkpoint.pt", "--output", "exports/model.onnx", "--format", "onnx"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Create Deployment Package",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "export", "--model-path", "models/checkpoint.pt", "--output", "deployment", "--format", "package", "--include-formats", "torchscript,onnx,mobile"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Run Tests",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "tests/", "-v"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Run Specific Test Module",
+            "type": "shell",
+            "command": "python",
+            "args": ["-m", "pytest", "tests/test_${input:testModule}.py", "-v"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Synthesize Test Audio",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "infer", "--text", "Hello, this is a test of the speech synthesis system.", "--output", "test_output.wav"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Clone Voice Sample",
+            "type": "shell",
+            "command": "python",
+            "args": ["main.py", "clone", "--text", "This is a cloned voice sample.", "--reference", "data/reference.wav", "--output", "cloned_output.wav"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Format Code",
+            "type": "shell",
+            "command": "black",
+            "args": ["src/", "*.py"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Lint Code",
+            "type": "shell",
+            "command": "flake8",
+            "args": ["src/"],
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            },
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Check requirements.txt for errors",
+            "type": "shell",
+            "command": "pip",
+            "args": ["check"],
+            "isBackground": false,
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            }
+        }
+    ]
+}
