@@ -28,8 +28,13 @@ class SpeechSynthesisLogger:
             enable_file_logging: Whether to enable file logging
             enable_console_logging: Whether to enable console logging
         """
+        self.logger = logger  # Direct access to loguru logger
         self.log_level = log_level
         self.log_dir = Path(log_dir)
+        self.enable_file_logging = enable_file_logging
+        self.enable_console_logging = enable_console_logging
+        
+        # Create log directory
         self.log_dir.mkdir(exist_ok=True)
         
         # Remove default logger
@@ -120,6 +125,10 @@ class SpeechSynthesisLogger:
 # Global logger instance
 def get_logger(config: Optional[dict] = None) -> SpeechSynthesisLogger:
     """Get configured logger instance."""
+    # Handle case where config is a string (like __name__)
+    if isinstance(config, str):
+        config = {}
+    
     if config is None:
         config = {}
     
@@ -129,6 +138,12 @@ def get_logger(config: Optional[dict] = None) -> SpeechSynthesisLogger:
         enable_file_logging=config.get("enable_file_logging", True),
         enable_console_logging=config.get("enable_console_logging", True)
     )
+
+
+# Simplified logger function for backward compatibility
+def get_simple_logger():
+    """Get a simple logger instance."""
+    return logger
 
 
 # Performance logging decorator

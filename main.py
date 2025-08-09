@@ -256,9 +256,6 @@ Examples:
         """
     )
     
-    # Add common arguments
-    add_common_args(parser)
-    
     # Create subparsers
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
@@ -274,19 +271,11 @@ Examples:
                              help='Learning rate for training')
     train_parser.add_argument('--epochs', type=int,
                              help='Number of training epochs')
-    train_parser.add_argument('--resume', type=str,
-                             help='Path to checkpoint to resume from')
     
     # Inference command
     infer_parser = subparsers.add_parser("infer", help="Synthesize speech from text")
     infer.add_args(infer_parser)
     add_common_args(infer_parser)
-    infer_parser.add_argument('--text', type=str, required=True,
-                             help='Text to synthesize')
-    infer_parser.add_argument('--output', type=str,
-                             help='Output audio file path')
-    infer_parser.add_argument('--model', type=str,
-                             help='Path to model checkpoint')
     infer_parser.add_argument('--speaker-id', type=int, default=0,
                              help='Speaker ID for multi-speaker models')
     infer_parser.add_argument('--speed', type=float, default=1.0,
@@ -296,12 +285,6 @@ Examples:
     clone_parser = subparsers.add_parser("clone", help="Clone voice from reference audio")
     clone.add_args(clone_parser)
     add_common_args(clone_parser)
-    clone_parser.add_argument('--text', type=str, required=True,
-                             help='Text to synthesize with cloned voice')
-    clone_parser.add_argument('--reference', type=str, required=True,
-                             help='Reference audio file path')
-    clone_parser.add_argument('--output', type=str,
-                             help='Output audio file path')
     clone_parser.add_argument('--similarity-threshold', type=float, default=0.7,
                              help='Minimum similarity threshold for cloning')
     

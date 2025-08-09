@@ -347,3 +347,41 @@ def save_model(model: nn.Module, path: str, model_config: Dict[str, Any],
 def count_parameters(model: nn.Module) -> int:
     """Count the number of trainable parameters in a model."""
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+class ModelFactory:
+    """Factory class for creating different TTS models."""
+    
+    def __init__(self, config: Dict[str, Any]):
+        """
+        Initialize model factory with configuration.
+        
+        Args:
+            config: Model configuration dictionary
+        """
+        self.config = config
+    
+    def create_model(self, model_type: str = None) -> nn.Module:
+        """
+        Create a model based on configuration.
+        
+        Args:
+            model_type: Override model type from config
+            
+        Returns:
+            Initialized model
+        """
+        if model_type is None:
+            model_type = self.config.get('model_type', 'tacotron2')
+        
+        return create_model(self.config, model_type)
+    
+    def load_model(self, checkpoint_path: str, device: str = 'cpu') -> nn.Module:
+        """Load model from checkpoint."""
+        return load_model(checkpoint_path, device)
+    
+    def save_model(self, model: nn.Module, path: str, 
+                   optimizer_state: Optional[Dict] = None, 
+                   epoch: Optional[int] = None):
+        """Save model checkpoint."""
+        return save_model(model, path, self.config, optimizer_state, epoch)

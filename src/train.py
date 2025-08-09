@@ -467,15 +467,9 @@ class TTSTrainer:
 
 
 def add_args(parser):
-    """Add training arguments to parser."""
-    parser.add_argument('--config', type=str, required=True,
-                       help='Path to configuration file')
-    parser.add_argument('--output-dir', type=str, default='./outputs',
-                       help='Output directory for checkpoints')
+    """Add training-specific arguments to parser."""
     parser.add_argument('--resume', type=str, default=None,
                        help='Path to checkpoint to resume from')
-    parser.add_argument('--device', type=str, default='auto',
-                       help='Device to use (auto, cpu, cuda, mps)')
 
 
 def run(args):
@@ -506,12 +500,9 @@ if __name__ == "__main__":
     add_args(parser)
     args = parser.parse_args()
     run(args)
-        print(f"Epoch {epoch+1}/{config.training.epochs} done.")
 
-def add_args(parser):
-    parser.add_argument('--config', type=str, required=True, help='Path to config YAML')
-    parser.add_argument('--data', type=str, required=True, help='Path to training data')
-    parser.add_argument('--output', type=str, default='models/', help='Output directory for checkpoints')
 
-def run(args):
-    train_loop(args.config, args.data, args.output)
+def run(args, config):
+    """Run training with command line arguments."""
+    trainer = TTSTrainer(config)
+    trainer.train()
