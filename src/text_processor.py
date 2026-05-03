@@ -349,6 +349,72 @@ class TextProcessor:
         
         return tokens
     
+    # ------------------------------------------------------------------
+    # VITS2 API — required by model, data, clone, infer modules
+    # ------------------------------------------------------------------
+
+    def _build_symbol_table(self) -> None:
+        """Build a reproducible symbol → integer mapping for IPA phonemes."""
+        # Core IPA symbols + special tokens used by espeak-ng output
+        base_symbols = (
+            list("abcdefghijklmnopqrstuvwxyz")
+            + list("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+            + list("0123456789")
+            + list(" .,!?;:-'\"()[]")
+            + [
+                # Common IPA / espeak phoneme characters
+                "ə", "ɪ", "ʊ", "ɛ", "æ", "ɑ", "ɒ", "ʌ", "ɔ", "ʒ", "ʃ",
+                "ð", "θ", "ŋ", "ɹ", "ɾ", "ʔ", "ˈ", "ˌ", "ː", "ɫ", "ɬ",
+                "ɡ", "ʁ", "ɥ", "ʏ", "ø", "œ", "ɤ", "ɯ", "ɑ̃", "ɛ̃", "ɔ̃",
+                "ˀ", "ʰ", "ʷ", "ʲ", "ʼ", "ˤ",
+                # Special tokens
+                "<pad>", "<unk>", "<bos>", "<eos>", "_",
+            ]
+        )
+        self._sym2id: Dict[str, int] = {s: i for i, s in enumerate(base_symbols)}
+        self._id2sym: Dict[int, str] = {i: s for s, i in self._sym2id.items()}
+
+    def text_to_phonemes(self, text: str) -> List[str]:
+        """
+        Normalise and phonemise text, returning a list of IPA symbol strings.
+
+        Falls back to character-level tokenisation if phonemizer fails.
+        """
+        text = self.clean_text(text)
+        text = self.expand_abbreviations(text)
+        text = self.normalize_numbers_and_dates(text)
+        text = self.add_punctuation_pauses(text)
+
+        try:
+            ph_str = self.phonemize_text(text, preserve_punctuation=True)
+            # Return individual characters (each IPA character or symbol)
+            return list(ph_str)
+        except Exception:
+            return list(text)
+
+    def phonemes_to_ids(self, phonemes: List[str]) -> List[int]:
+        """Convert a list of phoneme symbols to integer IDs."""
+        if not hasattr(self, "_sym2id"):
+            self._build_symbol_table()
+        unk = self._sym2id.get("<unk>", 1)
+        return [self._sym2id.get(p, unk) for p in phonemes]
+
+    def ids_to_phonemes(self, ids: List[int]) -> List[str]:
+        """Inverse of phonemes_to_ids."""
+        if not hasattr(self, "_id2sym"):
+            self._build_symbol_table()
+        return [self._id2sym.get(i, "<unk>") for i in ids]
+
+    @property
+    def vocab_size(self) -> int:
+        if not hasattr(self, "_sym2id"):
+            self._build_symbol_table()
+        return len(self._sym2id)
+
+    # convenience alias used by legacy code
+    def preprocess_text(self, text: str) -> str:
+        return self.clean_text(text)
+
     def get_text_statistics(self, text: str) -> Dict[str, int]:
         """Get statistics about the text."""
         processed_text = self.process_text(text)
