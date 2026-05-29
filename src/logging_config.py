@@ -83,6 +83,29 @@ class SpeechSynthesisLogger:
                 retention="180 days"
             )
     
+    # ------------------------------------------------------------------
+    # Standard log-level methods (delegate to the wrapped loguru logger).
+    # Several modules call ``get_logger().info(...)`` directly, so the
+    # wrapper must expose the usual level methods, not only ``self.logger``.
+    # ------------------------------------------------------------------
+    def debug(self, *args, **kwargs):
+        return self.logger.debug(*args, **kwargs)
+
+    def info(self, *args, **kwargs):
+        return self.logger.info(*args, **kwargs)
+
+    def warning(self, *args, **kwargs):
+        return self.logger.warning(*args, **kwargs)
+
+    def error(self, *args, **kwargs):
+        return self.logger.error(*args, **kwargs)
+
+    def critical(self, *args, **kwargs):
+        return self.logger.critical(*args, **kwargs)
+
+    def exception(self, *args, **kwargs):
+        return self.logger.exception(*args, **kwargs)
+
     def log_training_metrics(self, epoch: int, metrics: dict):
         """Log training metrics with structured format."""
         logger.bind(training=True).info(

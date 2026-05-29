@@ -136,7 +136,13 @@ def preprocess_text(text, lang='en'):
 
 class AudioProcessor:
     """Audio processing utilities."""
-    
+
+    def __init__(self, sample_rate: int = 22050):
+        # Default sample rate used by callers that construct an instance
+        # (e.g. AudioProcessor(sample_rate=sr)); the static helpers below
+        # still accept an explicit sample_rate per call.
+        self.sample_rate = sample_rate
+
     @staticmethod
     def load_audio(file_path: str, sample_rate: int = 22050) -> np.ndarray:
         """Load audio file."""
