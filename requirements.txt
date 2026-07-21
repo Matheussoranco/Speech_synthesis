@@ -44,3 +44,12 @@ ruff>=0.1.0
 matplotlib>=3.5.0
 pandas>=1.4.0
 joblib>=1.2.0
+
+# ─── Evaluation metrics (optional; imported under try/except in src/evaluate.py) ─
+pesq>=0.0.4
+pystoi>=0.3.3
+
+# ─── Coqui-TTS wrapper path (heavy; required only for src/tts_model.py demos) ────
+# Pins its own torch build — install in an isolated env if you use the wrapper:
+#   pip install TTS
+# TTS
