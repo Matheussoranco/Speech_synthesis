@@ -155,7 +155,16 @@ def cmd_infer(args):
     
     if not args.output:
         args.output = "output.wav"
-    
+
+    # --speed is the user-facing inverse of the model's length_scale
+    # (longer frames = slower speech), so translate before handing off.
+    speed = getattr(args, "speed", None)
+    if speed is not None:
+        if speed <= 0:
+            LOGGER.logger.error("--speed must be greater than 0")
+            return 1
+        args.length_scale = 1.0 / speed
+
     # Run inference
     infer.run(args, config)
     
@@ -273,20 +282,25 @@ Examples:
                              help='Number of training epochs')
     
     # Inference command
+    # NOTE: --speaker-id, --noise-scale, --length-scale etc. come from
+    # infer.add_args(); do not re-declare them here or argparse raises
+    # ArgumentError while the parser is still being built.
     infer_parser = subparsers.add_parser("infer", help="Synthesize speech from text")
     infer.add_args(infer_parser)
     add_common_args(infer_parser)
-    infer_parser.add_argument('--speaker-id', type=int, default=0,
-                             help='Speaker ID for multi-speaker models')
-    infer_parser.add_argument('--speed', type=float, default=1.0,
-                             help='Speech speed multiplier')
+    infer_parser.add_argument('--speed', type=float, default=None,
+                             help='Speech speed multiplier (2.0 = twice as fast); '
+                                  'overrides --length-scale')
     
     # Clone command
+    # NOTE: --similarity-threshold (and --model/--text/--output/--reference)
+    # come from clone.add_args(); re-declaring any of them here raises
+    # ArgumentError while the parser is still being built. It defaults to
+    # 0.0 there, which clone.py documents as "check disabled" — pass
+    # --similarity-threshold 0.7 to enforce a cosine-similarity floor.
     clone_parser = subparsers.add_parser("clone", help="Clone voice from reference audio")
     clone.add_args(clone_parser)
     add_common_args(clone_parser)
-    clone_parser.add_argument('--similarity-threshold', type=float, default=0.7,
-                             help='Minimum similarity threshold for cloning')
     
     # Web interface command
     web_parser = subparsers.add_parser("web", help="Launch web interface")

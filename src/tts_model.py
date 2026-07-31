@@ -5,7 +5,13 @@ class TTSWrapper:
     """
     Wrapper for Coqui TTS models (Tacotron2, YourTTS, etc.)
     """
-    def __init__(self, model_name="tts_models/en/your_tts"):
+    # Coqui model ids are always four segments — type/lang/dataset/model.
+    # YourTTS is multilingual, so it lives under multilingual/multi-dataset;
+    # the three-segment "tts_models/en/your_tts" makes TTS's ModelManager
+    # raise "not enough values to unpack (expected 4, got 3)" on load.
+    DEFAULT_MODEL = "tts_models/multilingual/multi-dataset/your_tts"
+
+    def __init__(self, model_name=DEFAULT_MODEL):
         self.tts = TTS(model_name)
 
     def synthesize(self, text, speaker_wav=None):
