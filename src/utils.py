@@ -127,11 +127,17 @@ def save_audio(path, audio, sr=22050):
 
 
 def preprocess_text(text, lang='en'):
-    """Preprocess text - legacy function."""
-    # Normalize and phonemize text
+    """Preprocess text - legacy function.
+
+    Routes through the shared espeak resolver so the bare ISO code ``en``
+    reaches a real espeak voice (``en-us``) and the library is located on
+    Windows, matching TextProcessor's behaviour.
+    """
+    from .text_processor import _ensure_espeak_library, _espeak_voice
+
     text = text.strip().lower()
-    phonemes = phonemize(text, language=lang, backend='espeak')
-    return phonemes
+    _ensure_espeak_library()
+    return phonemize(text, language=_espeak_voice(lang), backend='espeak')
 
 
 class AudioProcessor:
@@ -156,11 +162,19 @@ class AudioProcessor:
     
     @staticmethod
     def normalize_audio(audio: np.ndarray, target_rms: float = 0.1) -> np.ndarray:
-        """Normalize audio to target RMS level."""
+        """Normalize audio to target RMS level, then clip to [-1, 1].
+
+        RMS scaling alone has no peak guard: audio with a high crest factor
+        (quiet on average but with sharp transients) can end up with samples
+        outside [-1, 1] after being scaled up to target_rms, which silently
+        clips/wraps when written out as WAV. preprocess.py feeds this
+        straight into torchaudio.save/sf.write, so unclamped values here
+        corrupted training data.
+        """
         current_rms = np.sqrt(np.mean(audio ** 2))
         if current_rms > 0:
-            return audio * (target_rms / current_rms)
-        return audio
+            audio = audio * (target_rms / current_rms)
+        return np.clip(audio, -1.0, 1.0)
     
     @staticmethod
     def trim_silence(audio: np.ndarray, threshold: float = 0.01) -> np.ndarray:

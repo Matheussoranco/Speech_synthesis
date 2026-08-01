@@ -38,7 +38,13 @@ sys.path.insert(0, str(Path(__file__).parent / "src"))
 try:
     from src import train, infer, clone
     from src import evaluate, preprocess, export
-    from src.gradio_interface import launch_interface
+    # NOTE: src.gradio_interface is imported lazily inside cmd_web() instead
+    # of here. It pulls in src.tts_model -> `from TTS.api import TTS`, an
+    # optional, heavy dependency that requirements.txt deliberately leaves
+    # commented out ("install in an isolated env if you use the wrapper").
+    # Importing it unconditionally at module load meant every subcommand
+    # (train/infer/clone/evaluate/preprocess/export) failed with ImportError
+    # whenever Coqui TTS wasn't installed, even though none of them use it.
     from src.logging_config import get_logger
     from src.utils import setup_reproducibility, get_device
     from omegaconf import OmegaConf
@@ -202,6 +208,7 @@ def cmd_web(args):
     
     # Launch interface
     try:
+        from src.gradio_interface import launch_interface
         launch_interface(
             config_path=args.config,
             share=getattr(args, 'share', False),

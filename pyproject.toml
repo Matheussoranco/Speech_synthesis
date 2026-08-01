@@ -64,6 +64,16 @@ monitoring = [
 [project.scripts]
 speech-synthesis = "main:main"
 
+# Without this, setuptools' auto-discovery found no packages to install at
+# all (no top-level dir matches the "speech_synthesis" name) — `pip install
+# -e .` "succeeded" but installed zero code, so the [project.scripts] entry
+# point above raised `ModuleNotFoundError: No module named 'main'`.
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["src*"]
+
 [tool.black]
 line-length = 88
 target-version = ['py38']

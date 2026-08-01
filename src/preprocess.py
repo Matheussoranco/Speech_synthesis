@@ -495,11 +495,12 @@ def run(args, config: DictConfig):
         logger.error("Output directory not specified. Use --output-dir")
         return 1
     
-    # Create preprocessor
-    preprocessor = DatasetPreprocessor(config)
-    
-    # Run preprocessing
+    # Run preprocessing. DatasetPreprocessor(config) construction is inside
+    # this try (it previously wasn't), so a bad config or preprocessor
+    # failure is reported the same way as a mid-run failure instead of
+    # propagating as an uncaught exception out of run().
     try:
+        preprocessor = DatasetPreprocessor(config)
         dataset_format = getattr(args, 'format', 'auto')
         
         if dataset_format == 'ljspeech' or (dataset_format == 'auto' and 'ljspeech' in args.input_dir.lower()):

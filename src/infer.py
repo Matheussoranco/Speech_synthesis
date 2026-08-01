@@ -143,7 +143,11 @@ def add_args(parser):
 
 
 def run(args, config=None):
-    device = getattr(args, "device", "cpu")
+    # args.device is the raw CLI string (default "auto"); torch.device("auto")
+    # raises, and every downstream .to(device) call needs a real device, so
+    # resolve it the same way train.py does before handing it off.
+    from src.utils import get_device
+    device = str(get_device(getattr(args, "device", "cpu")))
     inferencer = TTSInferencer.from_checkpoint(args.model, device=device, config=config)
     out = inferencer.synthesize_to_file(
         args.text, args.output,

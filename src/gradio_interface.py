@@ -205,8 +205,11 @@ class SpeechSynthesisInterface:
             return None, audio_error, {}
         
         try:
-            # Extract speaker embedding
-            speaker_embedding = self.speaker_encoder.extract_embedding(audio_np, sample_rate)
+            # Extract speaker embedding (SpeakerEncoder has no
+            # `extract_embedding` method — the real API is
+            # `embed_utterance_numpy(wav, sr)`; the old name raised
+            # AttributeError on every voice-cloning request).
+            speaker_embedding = self.speaker_encoder.embed_utterance_numpy(audio_np, sample_rate)
             
             # Calculate similarity (placeholder for actual implementation)
             similarity_score = np.random.uniform(0.6, 0.9)  # Placeholder

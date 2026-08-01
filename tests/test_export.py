@@ -13,6 +13,7 @@ import torch
 from omegaconf import OmegaConf
 
 from src.export import ModelExporter, run
+import importlib.util
 
 
 class TestModelExporter:
@@ -32,7 +33,8 @@ class TestModelExporter:
         exporter = ModelExporter(self.config)
         
         assert exporter.config == self.config
-        assert exporter.device == 'cpu'
+        # get_device() returns a torch.device, not a plain string.
+        assert exporter.device.type == 'cpu'
         mock_text_processor.assert_called_once_with(self.config)
     
     @patch('src.export.ModelFactory')
@@ -51,7 +53,8 @@ class TestModelExporter:
         model = exporter._load_model("fake_path.pt")
         
         mock_model.load_state_dict.assert_called_once_with(mock_checkpoint['model_state_dict'])
-        mock_model.to.assert_called_once_with('cpu')
+        # get_device() returns a torch.device, not a plain string.
+        mock_model.to.assert_called_once_with(torch.device('cpu'))
     
     @patch('src.export.ModelFactory')
     @patch('src.export.TextProcessor')
@@ -84,6 +87,8 @@ class TestModelExporter:
     
     @patch('src.export.ModelFactory')
     @patch('src.export.TextProcessor')
+    @pytest.mark.skipif(importlib.util.find_spec('onnx') is None,
+                        reason='optional dependency onnx is not installed')
     @patch('torch.onnx.export')
     @patch('onnx.load')
     @patch('onnx.checker.check_model')
@@ -147,10 +152,12 @@ class TestModelExporter:
         mock_model.return_value = mock_output
         mock_model_factory.return_value.create_model.return_value = mock_model
         
-        # Mock traced model
+        # Mock traced model. save() must actually create the file: the
+        # exporter stat()s the output to report its size, so a no-op save
+        # makes a successful export look like a failure.
         mock_traced = Mock()
         mock_traced.return_value = mock_output
-        mock_traced.save = Mock()
+        mock_traced.save = Mock(side_effect=lambda path: Path(path).write_bytes(b"torchscript"))
         mock_trace.return_value = mock_traced
         
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -183,7 +190,7 @@ class TestModelExporter:
         # Mock scripted model
         mock_scripted = Mock()
         mock_scripted.return_value = mock_output
-        mock_scripted.save = Mock()
+        mock_scripted.save = Mock(side_effect=lambda path: Path(path).write_bytes(b"torchscript"))
         mock_script.return_value = mock_scripted
         
         with tempfile.TemporaryDirectory() as temp_dir:

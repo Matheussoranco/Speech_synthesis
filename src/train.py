@@ -245,7 +245,10 @@ class VITS2Trainer:
                 sample_rate=self.cfg.data.get("sample_rate", 22050),
                 hop_size=self.cfg.data.get("hop_length", 256),
             )
-            loss_kl = kl_loss(out["z_p"], out["logs_q"], out["m_p"], out["logs_p"], out["z_mask"])
+            # SynthesizerTrn.forward() returns the posterior/decoder-side
+            # mask as "y_mask" (there is no "z_mask" key) — z/z_p/m_q/logs_q
+            # all live in the mel-frame-length (T_y) space that y_mask covers.
+            loss_kl = kl_loss(out["z_p"], out["logs_q"], out["m_p"], out["logs_p"], out["y_mask"])
             loss_dur = out["l_length"] / max(x.shape[0], 1)
 
             loss_fm = feature_loss(fmap_rs + fmap_rs2, fmap_gs + fmap_gs2)

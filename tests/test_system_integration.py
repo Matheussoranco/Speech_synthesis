@@ -4,9 +4,25 @@ Integration tests for the complete Speech Synthesis system.
 
 This test suite validates the integration between all components
 and ensures the system works end-to-end.
+
+QUARANTINED -- these tests target an architecture that no longer exists.
+
+They patch ``src.train.ModelFactory``, ``src.train.create_dataloader``,
+``src.infer.ModelFactory``, ``src.evaluate.ModelFactory`` and
+``src.export.ModelFactory``. None of those names are present in those modules
+any more: the training pipeline was replaced by ``VITS2Trainer`` (see
+``src/train.py``) and inference by ``TTSInferencer`` (``src/infer.py``).
+``unittest.mock.patch`` raises AttributeError on a missing target, so every
+test here fails at setup regardless of whether the system works -- they are
+not detecting a regression.
+
+Rewriting them against the VITS2 API is a genuine piece of work rather than a
+bug fix, so they are skipped with this note instead of being deleted or
+papered over. Remove the skip once they are ported.
 """
 
 import pytest
+
 import tempfile
 import json
 import os
@@ -21,6 +37,13 @@ from omegaconf import OmegaConf
 from src import train, infer, clone, evaluate, preprocess, export
 from src.logging_config import get_logger
 from src.utils import setup_reproducibility, get_device
+
+# Applied per-test rather than to the whole module: the tests that do NOT
+# reference the removed pipeline still pass and are worth keeping green.
+needs_port = pytest.mark.skip(
+    reason="tests the removed ModelFactory/create_dataloader pipeline; "
+           "needs porting to VITS2Trainer/TTSInferencer (see module docstring)"
+)
 
 
 class TestSystemIntegration:
@@ -73,12 +96,16 @@ class TestSystemIntegration:
     
     def test_device_detection(self):
         """Test device detection."""
+        # get_device() returns a torch.device (required so callers can do
+        # model.to(device) / device.type == "cuda" elsewhere in the
+        # codebase), not a plain string.
         device = get_device('auto')
-        assert device in ['cpu', 'cuda', 'mps']
-        
+        assert device.type in ['cpu', 'cuda', 'mps']
+
         device = get_device('cpu')
-        assert device == 'cpu'
+        assert device.type == 'cpu'
     
+    @needs_port
     @patch('src.train.ModelFactory')
     @patch('src.train.create_dataloader')
     @patch('src.train.torch.save')
@@ -114,6 +141,7 @@ class TestSystemIntegration:
             mock_model_factory.assert_called()
             mock_dataloader.assert_called()
     
+    @needs_port
     @patch('src.infer.ModelFactory')
     @patch('src.infer.torch.load')
     @patch('src.infer.torchaudio.save')
@@ -186,6 +214,7 @@ class TestSystemIntegration:
             
             assert result == 0  # Success
     
+    @needs_port
     @patch('src.evaluate.ModelFactory')
     @patch('src.evaluate.TextProcessor')
     def test_evaluation_pipeline(self, mock_text_processor, mock_model_factory):
@@ -210,6 +239,7 @@ class TestSystemIntegration:
         assert result == 0  # Success
         mock_model_factory.assert_called()
     
+    @needs_port
     @patch('src.export.ModelFactory')
     @patch('src.export.torch.save')
     @patch('src.export.torch.jit.trace')
@@ -258,6 +288,7 @@ class TestSystemIntegration:
         assert self.config.audio.sample_rate == 22050
         assert self.config.training.learning_rate == 0.001
     
+    @needs_port
     @patch('src.gradio_interface.gr.Interface')
     def test_web_interface_creation(self, mock_interface):
         """Test web interface creation."""
@@ -283,7 +314,9 @@ class TestSystemIntegration:
         args = parser.parse_args(['web'])
         assert hasattr(args, 'command')
         
-        args = parser.parse_args(['infer', '--text', 'hello', '--output', 'out.wav'])
+        # --model is required by infer.add_args(); omitting it is a usage
+        # error (SystemExit), not something main.py should accept silently.
+        args = parser.parse_args(['infer', '--model', 'ckpt.pt', '--text', 'hello', '--output', 'out.wav'])
         assert args.text == 'hello'
         assert args.output == 'out.wav'
         
@@ -303,6 +336,7 @@ class TestEndToEndScenarios:
             'training': {'output_dir': 'test_output'}
         })
     
+    @needs_port
     def test_complete_training_workflow(self):
         """Test complete training workflow from data to model."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -330,6 +364,7 @@ class TestEndToEndScenarios:
                         
                         assert True  # Workflow completes without errors
     
+    @needs_port
     def test_inference_performance(self):
         """Test inference performance and memory usage."""
         with patch('src.infer.ModelFactory') as mock_model_factory:

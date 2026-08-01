@@ -552,13 +552,15 @@ def run(args, config: DictConfig):
         logger.error("Output path not specified. Use --output")
         return 1
     
-    # Create exporter
-    exporter = ModelExporter(config)
-    
     # Determine export type
     export_format = getattr(args, 'format', 'torchscript')
-    
+
+    # ModelExporter(config) construction is inside this try (it previously
+    # wasn't), so a bad config or exporter failure is reported the same way
+    # as a mid-run failure instead of propagating as an uncaught exception
+    # out of run() (mirrors the same fix in src/preprocess.py::run).
     try:
+        exporter = ModelExporter(config)
         if export_format == 'package':
             # Create deployment package
             formats = getattr(args, 'include_formats', ['torchscript', 'onnx'])
