@@ -175,6 +175,12 @@ class HiFiGANGenerator(nn.Module):
                 self.resblocks[i * self.num_kernels + j](x)
                 for j in range(self.num_kernels)
             ) / self.num_kernels
+            # Feed the MRF output into the next upsampling stage. Without
+            # this, `x` stayed the raw pre-ResBlock upsample output, so every
+            # stage but the last had its ResBlocks computed and thrown away
+            # (the next stage upsampled `x`, not `xs`) — a silent audio
+            # quality bug, not a crash.
+            x = xs
 
         x = F.leaky_relu(xs, LRELU_SLOPE)
         x = self.conv_post(x)

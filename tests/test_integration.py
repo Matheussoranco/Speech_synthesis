@@ -12,8 +12,11 @@ class TestTTSIntegration(unittest.TestCase):
     def test_speaker_encoder(self):
         encoder = SpeakerEncoder()
         dummy_wav = np.random.randn(16000)
-        emb = encoder.extract_embedding(dummy_wav, sr=16000)
-        self.assertEqual(emb.shape[-1], 256)
+        # SpeakerEncoder has no `extract_embedding` method; the real API is
+        # embed_utterance_numpy(wav, sr), returning the configured emb_dim
+        # (192, matching config.yaml's speaker_encoder.emb_dim), not 256.
+        emb = encoder.embed_utterance_numpy(dummy_wav, sr=16000)
+        self.assertEqual(emb.shape[-1], 192)
 
 if __name__ == '__main__':
     unittest.main()

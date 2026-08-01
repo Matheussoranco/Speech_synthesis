@@ -328,6 +328,17 @@ class SpeakerEncoder(nn.Module):
         )
         self.amplitude_to_db = torchaudio.transforms.AmplitudeToDB(stype="power", top_db=80)
         self.to(device)
+        # This wrapper is only ever used for embedding extraction (there is
+        # no speaker-encoder training script in this repo) and
+        # embed_utterance() commonly runs a single utterance (batch size 1)
+        # through ECAPA_TDNN's BatchNorm1d layers. In the default training
+        # mode, BatchNorm1d raises ValueError for batch size 1 ("Expected
+        # more than 1 value per channel"). clone.py's VoiceCloner papers
+        # over this with its own explicit .eval() call after construction,
+        # but gradio_interface.py/web_demo.py construct SpeakerEncoder()
+        # directly and never call .eval(), so voice cloning there crashed
+        # for any reference clip short enough to land in a single segment.
+        self.eval()
 
     def extract_mel(self, wav: torch.Tensor) -> torch.Tensor:
         """wav: (T,) or (1, T) at self.sample_rate → (1, n_mels, frames)."""

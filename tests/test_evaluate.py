@@ -14,6 +14,7 @@ import numpy as np
 from omegaconf import OmegaConf
 
 from src.evaluate import AudioMetrics, ModelEvaluator, run
+import importlib.util
 
 
 class TestAudioMetrics:
@@ -58,6 +59,8 @@ class TestAudioMetrics:
         assert isinstance(snr, float)
         # Should handle length mismatch gracefully
     
+    @pytest.mark.skipif(importlib.util.find_spec('pesq') is None,
+                        reason='optional dependency pesq is not installed')
     @patch('src.evaluate.PESQ_AVAILABLE', True)
     @patch('pesq.pesq')
     def test_calculate_pesq_success(self, mock_pesq):
@@ -109,7 +112,8 @@ class TestModelEvaluator:
         evaluator = ModelEvaluator(self.config)
         
         assert evaluator.config == self.config
-        assert evaluator.device == 'cpu'
+        # get_device() returns a torch.device, not a plain string.
+        assert evaluator.device.type == 'cpu'
         mock_text_processor.assert_called_once_with(self.config)
         mock_model_factory.assert_called_once_with(self.config)
     
@@ -120,6 +124,9 @@ class TestModelEvaluator:
         # Mock model
         mock_model = Mock()
         mock_model.generate.return_value = torch.randn(1, 1000)
+        # The evaluator calls .to(device); without this the chain returns a
+        # fresh Mock and every configured return value is bypassed.
+        mock_model.to.return_value = mock_model
         mock_model_factory.return_value.create_model.return_value = mock_model
         
         # Mock text processor
@@ -139,6 +146,9 @@ class TestModelEvaluator:
         # Mock model that raises exception
         mock_model = Mock()
         mock_model.generate.side_effect = RuntimeError("Model error")
+        # The evaluator calls .to(device); without this the chain returns a
+        # fresh Mock and every configured return value is bypassed.
+        mock_model.to.return_value = mock_model
         mock_model_factory.return_value.create_model.return_value = mock_model
         
         # Mock text processor
@@ -156,6 +166,9 @@ class TestModelEvaluator:
         # Mock model
         mock_model = Mock()
         mock_model.generate.return_value = torch.randn(1, 1000)
+        # The evaluator calls .to(device); without this the chain returns a
+        # fresh Mock and every configured return value is bypassed.
+        mock_model.to.return_value = mock_model
         mock_model_factory.return_value.create_model.return_value = mock_model
         
         # Mock text processor

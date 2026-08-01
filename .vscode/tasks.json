@@ -48,7 +48,7 @@
             "label": "Run Setup Script",
             "type": "shell",
             "command": "python",
-            "args": ["setup.py"],
+            "args": ["quick_setup.py"],
             "group": "build",
             "presentation": {
                 "echo": true,

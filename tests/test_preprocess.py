@@ -11,6 +11,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock, mock_open
 
 import numpy as np
+import torch
 from omegaconf import OmegaConf
 
 from src.preprocess import DatasetPreprocessor, run

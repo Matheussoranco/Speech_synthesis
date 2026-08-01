@@ -430,9 +430,19 @@ class ModelEvaluator:
 def run(args, config: DictConfig):
     """Run model evaluation."""
     logger.info("Starting model evaluation")
-    
+
+    # Validate before constructing the evaluator: building one resolves the
+    # device and loads a checkpoint, so doing it first meant an invocation with
+    # no --dataset/--benchmark paid the full setup cost only to error out --
+    # and crashed outright on a config with no `system` section.
+    has_dataset = bool(getattr(args, 'dataset', None))
+    has_benchmark = bool(getattr(args, 'benchmark', False))
+    if not has_dataset and not has_benchmark:
+        logger.error("No evaluation type specified. Use --dataset or --benchmark")
+        return 1
+
     evaluator = ModelEvaluator(config)
-    
+
     # Determine evaluation type
     if hasattr(args, 'dataset') and args.dataset:
         # Dataset evaluation

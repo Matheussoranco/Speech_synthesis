@@ -2,8 +2,13 @@
 Advanced text processing for speech synthesis.
 Handles phonemization, normalization, and multi-language support.
 """
+import logging
+import os
 import re
+import shutil
+import sys
 import unicodedata
+from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 import string
 import inflect
@@ -14,51 +19,174 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 import spacy
 from unidecode import unidecode
 
+logger = logging.getLogger(__name__)
+
+
+def _ensure_espeak_library() -> bool:
+    """Point phonemizer at libespeak-ng on Windows.
+
+    The espeak-ng MSI installs ``espeak-ng.exe`` onto PATH but phonemizer loads
+    the shared library directly, and on Windows it does not look next to the
+    executable. Without ``PHONEMIZER_ESPEAK_LIBRARY`` set by hand,
+    ``EspeakBackend.is_available()`` is False even on a machine where espeak-ng
+    is perfectly well installed. Locate the DLL and register it.
+
+    Returns True when a usable espeak library is available.
+    """
+    try:
+        from phonemizer.backend import EspeakBackend
+    except Exception:
+        return False
+
+    if EspeakBackend.is_available():
+        return True
+
+    candidates = []
+    env_lib = os.environ.get("PHONEMIZER_ESPEAK_LIBRARY")
+    if env_lib:
+        candidates.append(Path(env_lib))
+
+    exe = shutil.which("espeak-ng") or shutil.which("espeak")
+    if exe:
+        exe_dir = Path(exe).parent
+        candidates += [exe_dir / "libespeak-ng.dll", exe_dir.parent / "libespeak-ng.dll"]
+
+    if sys.platform == "win32":
+        for root in (r"C:\Program Files\eSpeak NG", r"C:\Program Files (x86)\eSpeak NG"):
+            candidates.append(Path(root) / "libespeak-ng.dll")
+    else:
+        candidates += [Path("/usr/lib/x86_64-linux-gnu/libespeak-ng.so.1"),
+                       Path("/usr/local/lib/libespeak-ng.dylib")]
+
+    for lib in candidates:
+        try:
+            if not lib.is_file():
+                continue
+            # ESPEAK_DATA_PATH must be set *before* the library is registered:
+            # the wrapper resolves its voice-data directory at load time, and
+            # setting it afterwards leaves every voice failing to load.
+            data_dir = lib.parent / "espeak-ng-data"
+            if data_dir.is_dir():
+                os.environ.setdefault("ESPEAK_DATA_PATH", str(lib.parent))
+
+            from phonemizer.backend.espeak.wrapper import EspeakWrapper
+
+            EspeakWrapper.set_library(str(lib))
+            os.environ.setdefault("PHONEMIZER_ESPEAK_LIBRARY", str(lib))
+            if EspeakBackend.is_available():
+                logger.info("Using espeak library at %s", lib)
+                return True
+        except Exception:  # pragma: no cover - probing only
+            continue
+    return False
+
+
+# espeak-ng has no bare "en" voice -- it ships en-us/en-gb and fails with
+# 'failed to load voice "en"'. config.yaml ships language: "en", so map the
+# bare ISO codes callers naturally write onto real espeak voice names.
+_ESPEAK_VOICE_ALIASES = {
+    "en": "en-us",
+    "pt": "pt-br",
+    "zh": "cmn",
+    "ja": "ja",
+    "ko": "ko",
+}
+
+
+def _espeak_voice(language: str) -> str:
+    """Map an ISO language code onto an espeak-ng voice name."""
+    if not language:
+        return "en-us"
+    lang = str(language).strip().lower().replace("_", "-")
+    return _ESPEAK_VOICE_ALIASES.get(lang, lang)
+
+
+def _get_cfg(cfg, key: str, default=None):
+    """Read *key* from a config that may be a dict, an OmegaConf node, or an
+    attribute-style object. Returns *default* when absent."""
+    if cfg is None:
+        return default
+    try:
+        if hasattr(cfg, "get") and not isinstance(cfg, type):
+            value = cfg.get(key, default)
+            return default if value is None else value
+    except Exception:
+        pass
+    return getattr(cfg, key, default)
+
 
 class TextProcessor:
     """Advanced text processor for TTS systems."""
     
-    def __init__(self, 
-                 language: str = "en",
+    def __init__(self,
+                 language="en",
                  phoneme_backend: str = "espeak",
                  normalize_numbers: bool = True,
                  normalize_abbreviations: bool = True,
                  add_punctuation_pause: bool = True):
         """
         Initialize text processor.
-        
+
         Args:
-            language: Language code (en, es, fr, de, etc.)
+            language: Language code (en, es, fr, de, ...), *or* a full config
+                object. Both calling conventions exist in this codebase --
+                ``TextProcessor(config)`` (preprocess/evaluate/export) and
+                ``TextProcessor(language=..., ...)`` (train/infer/clone/gradio)
+                -- so the config form is detected and unpacked here rather than
+                being silently accepted as a language code.
             phoneme_backend: Phonemizer backend (espeak, festival)
             normalize_numbers: Whether to normalize numbers to words
             normalize_abbreviations: Whether to expand abbreviations
             add_punctuation_pause: Whether to add pauses for punctuation
         """
+        if not isinstance(language, str) and language is not None:
+            cfg = language
+            section = _get_cfg(cfg, "text_processing") or _get_cfg(cfg, "text") or {}
+            language = _get_cfg(section, "language", "en")
+            phoneme_backend = _get_cfg(section, "phoneme_backend", phoneme_backend)
+            normalize_numbers = _get_cfg(section, "normalize_numbers", normalize_numbers)
+            normalize_abbreviations = _get_cfg(
+                section, "normalize_abbreviations", normalize_abbreviations
+            )
+
         self.language = language
         self.phoneme_backend = phoneme_backend
         self.normalize_numbers = normalize_numbers
         self.normalize_abbreviations = normalize_abbreviations
         self.add_punctuation_pause = add_punctuation_pause
-        
+
         # Initialize components
-        self._init_phonemizer()
+        self._phonemizer = None  # built on first use — see the `phonemizer` property
+        self._phonemizer_nopunct = None
         self._init_normalizers()
         self._init_language_specific()
-        
+
         # Download required NLTK data
         try:
             nltk.data.find('tokenizers/punkt')
         except LookupError:
             nltk.download('punkt')
-    
-    def _init_phonemizer(self):
-        """Initialize phonemizer backend."""
-        if self.phoneme_backend == "espeak":
-            self.phonemizer = EspeakBackend(
-                language=self.language,
+
+    @property
+    def phonemizer(self):
+        """The espeak backend, constructed on first access.
+
+        Building it eagerly made *constructing* a TextProcessor fail on any
+        machine without the espeak-ng shared library, even for the many callers
+        that never phonemize (dataset format detection, audio resampling,
+        number/abbreviation normalisation). espeak is now required only when
+        phonemes are actually requested.
+        """
+        if self._phonemizer is None:
+            if self.phoneme_backend != "espeak":
+                raise ValueError(f"unsupported phoneme backend: {self.phoneme_backend!r}")
+            _ensure_espeak_library()
+            self._phonemizer = EspeakBackend(
+                language=_espeak_voice(self.language),
                 preserve_punctuation=True,
-                with_stress=True
+                with_stress=True,
             )
+        return self._phonemizer
     
     def _init_normalizers(self):
         """Initialize text normalizers."""
@@ -288,18 +416,38 @@ class TextProcessor:
         return text
     
     def phonemize_text(self, text: str, preserve_punctuation: bool = True) -> str:
-        """Convert text to phonemes."""
+        """Convert text to phonemes.
+
+        Goes through the cached backend rather than the module-level
+        ``phonemize`` helper, so the espeak library resolved in
+        :func:`_ensure_espeak_library` is actually used.
+        """
+        if not text:
+            return text
         try:
-            phonemes = phonemize(
-                text,
-                language=self.language,
-                backend=self.phoneme_backend,
-                preserve_punctuation=preserve_punctuation,
-                with_stress=True
+            if preserve_punctuation:
+                backend = self.phonemizer
+            else:
+                # Cached separately: preserve_punctuation is fixed at backend
+                # construction time and is not readable back off the instance.
+                if self._phonemizer_nopunct is None:
+                    _ensure_espeak_library()
+                    self._phonemizer_nopunct = EspeakBackend(
+                        language=_espeak_voice(self.language),
+                        preserve_punctuation=False,
+                        with_stress=True,
+                    )
+                backend = self._phonemizer_nopunct
+            result = backend.phonemize([text], strip=True)
+            return result[0] if result else text
+        except Exception as exc:
+            # Falling back to graphemes silently would let a model train on raw
+            # text while every log line claimed it was using phonemes.
+            logger.warning(
+                "Phonemization failed (%s: %s); falling back to raw text. "
+                "Is espeak-ng installed and on PATH?",
+                type(exc).__name__, exc,
             )
-            return phonemes
-        except Exception as e:
-            # Fallback to original text if phonemization fails
             return text
     
     def process_text(self, text: str, 
