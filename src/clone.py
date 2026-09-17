@@ -27,9 +27,10 @@ import torchaudio
 import numpy as np
 import soundfile as sf
 
-from src.model import SynthesizerTrn
-from src.speaker_encoder import SpeakerEncoder
-from src.text_processor import TextProcessor
+from .model import SynthesizerTrn
+from .speaker_encoder import SpeakerEncoder
+from .text_processor import TextProcessor
+from .utils import secure_torch_load
 
 
 class VoiceCloner:
@@ -72,34 +73,10 @@ class VoiceCloner:
                 Path(checkpoint_path).parent.parent / "config.yaml"
             )
 
-        from src.model import SynthesizerTrn
-        hp = config.model.get("params", {})
-        syn = SynthesizerTrn(
-            n_vocab=hp.get("n_vocab", 512),
-            spec_channels=hp.get("spec_channels", 513),
-            segment_size=hp.get("segment_size", 8192),
-            inter_channels=hp.get("inter_channels", 192),
-            hidden_channels=hp.get("hidden_channels", 192),
-            filter_channels=hp.get("filter_channels", 768),
-            n_heads=hp.get("n_heads", 2),
-            n_layers=hp.get("n_layers", 6),
-            kernel_size=hp.get("kernel_size", 3),
-            p_dropout=0.0,
-            resblock=hp.get("resblock", "1"),
-            resblock_kernel_sizes=tuple(hp.get("resblock_kernel_sizes", [3, 7, 11])),
-            resblock_dilation_sizes=tuple(
-                tuple(d) for d in hp.get("resblock_dilation_sizes", [[1,3,5],[1,3,5],[1,3,5]])
-            ),
-            upsample_rates=tuple(hp.get("upsample_rates", [8, 8, 2, 2])),
-            upsample_initial_channel=hp.get("upsample_initial_channel", 512),
-            upsample_kernel_sizes=tuple(hp.get("upsample_kernel_sizes", [16, 16, 4, 4])),
-            n_speakers=hp.get("n_speakers", 0),
-            gin_channels=hp.get("gin_channels", 256),
-            use_sdp=hp.get("use_sdp", True),
-        )
+        from .from_checkpoint import build_synthesizer, load_synthesizer_state
 
-        ckpt = torch.load(checkpoint_path, map_location=device)
-        syn.load_state_dict(ckpt["net_g"])
+        syn = build_synthesizer(config, p_dropout=0.0)
+        load_synthesizer_state(syn, checkpoint_path, device=device, strict=False)
 
         spk_enc = SpeakerEncoder(
             sample_rate=16000,
@@ -110,7 +87,7 @@ class VoiceCloner:
         )
         if speaker_encoder_path and os.path.exists(speaker_encoder_path):
             spk_enc.model.load_state_dict(
-                torch.load(speaker_encoder_path, map_location=device)
+                secure_torch_load(speaker_encoder_path, map_location=device)
             )
 
         tp = TextProcessor(
@@ -170,6 +147,11 @@ class VoiceCloner:
         # 2. Phoneme sequence
         phonemes = self.tp.text_to_phonemes(text)
         ids = self.tp.phonemes_to_ids(phonemes)
+        if not ids:
+            raise ValueError(
+                "no phoneme ids produced for the input text — refusing to "
+                "synthesize silence; check language/backend and input text"
+            )
         x = torch.LongTensor(ids).unsqueeze(0).to(self.device)
         x_lengths = torch.LongTensor([len(ids)]).to(self.device)
 
@@ -244,7 +226,7 @@ def run(args, config=None):
     # args.device is the raw CLI string (default "auto"); torch.device("auto")
     # raises, and every downstream .to(device) call needs a real device, so
     # resolve it the same way train.py does before handing it off.
-    from src.utils import get_device
+    from .utils import get_device
     device = str(get_device(getattr(args, "device", "cpu")))
     cloner = VoiceCloner.from_checkpoint(args.model, device=device, config=config)
     sim = cloner.clone_to_file(

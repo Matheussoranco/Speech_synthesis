@@ -257,3 +257,38 @@ def get_device(device_str: str = "auto") -> torch.device:
             return torch.device("cpu")
     else:
         return torch.device(device_str)
+
+
+def secure_torch_load(path: Union[str, Path], map_location=None,
+                      expected_sha256: Optional[str] = None):
+    """Load a torch checkpoint with `weights_only=True` + optional hash check.
+
+    - `weights_only=True` blocks pickle-based arbitrary code execution on
+      untrusted checkpoints (torch >= 1.13; default since 2.6).
+    - If `expected_sha256` is None, a sidecar `<file>.sha256` (format of
+      `sha256sum`, as written by training scripts) is honoured when present.
+      Pass an explicit hash for strict provenance; mismatches raise ValueError.
+    - Optimizer/resume checkpoints saved by this repo contain only tensors +
+      plain dicts, so `weights_only=True` still loads them. If a legacy
+      checkpoint needs full unpickling, re-save it from a trusted env instead
+      of disabling this flag.
+    """
+    p = Path(path)
+    raw = p.read_bytes()
+    expected = expected_sha256
+    if expected is None:
+        sidecar = p.parent / (p.name + ".sha256")
+        if sidecar.exists():
+            try:
+                expected = sidecar.read_text(encoding="utf-8").split()[0]
+            except Exception:
+                expected = None
+    if expected:
+        actual = hashlib.sha256(raw).hexdigest()
+        if actual.strip().lower() != expected.strip().lower():
+            raise ValueError(
+                f"SHA-256 mismatch for checkpoint {p.name}: "
+                f"expected {expected[:12]}…, got {actual[:12]}…"
+            )
+    import io as _io
+    return torch.load(_io.BytesIO(raw), map_location=map_location, weights_only=True)

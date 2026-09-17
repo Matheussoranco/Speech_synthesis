@@ -143,7 +143,7 @@ class TestSystemIntegration:
     
     @needs_port
     @patch('src.infer.ModelFactory')
-    @patch('src.infer.torch.load')
+    @patch('src.utils.secure_torch_load')
     @patch('src.infer.torchaudio.save')
     def test_inference_pipeline(self, mock_save, mock_load, mock_model_factory):
         """Test inference pipeline integration."""
@@ -375,7 +375,7 @@ class TestEndToEndScenarios:
             
             # Test multiple inferences
             for i in range(5):
-                with patch('src.infer.torch.load'):
+                with patch('src.utils.secure_torch_load'):
                     with patch('src.infer.torchaudio.save'):
                         args = Mock()
                         args.text = f"Test text {i}"
@@ -393,7 +393,7 @@ class TestEndToEndScenarios:
         args.model = "nonexistent.pt"
         args.output = "output.wav"
         
-        with patch('src.infer.torch.load', side_effect=FileNotFoundError):
+        with patch('src.utils.secure_torch_load', side_effect=FileNotFoundError):
             # Should handle error gracefully
             try:
                 result = infer.run(args, self.config)

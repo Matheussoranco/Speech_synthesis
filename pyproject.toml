@@ -23,6 +23,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
+    # Core — mirrors requirements.txt (keep the two in sync).
     "numpy>=1.24.0",
     "scipy>=1.11.0",
     "torch>=2.0.0",
@@ -32,16 +33,38 @@ dependencies = [
     "nltk>=3.8.0",
     "inflect>=6.0.0",
     "soundfile>=0.12.0",
+    "librosa>=0.10.0",
     "omegaconf>=2.3.0",
     "tqdm>=4.65.0",
     "loguru>=0.7.0",
     "tensorboard>=2.13.0",
+    "matplotlib>=3.5.0",
     "gradio>=4.0.0",
     "fastapi>=0.100.0",
     "uvicorn>=0.23.0",
 ]
 
 [project.optional-dependencies]
+# Heavy/optional — see requirements.txt (same pins, not core).
+audio = [
+    "pydub>=0.25.0",
+    "noisereduce>=2.0.0",
+]
+eval = [
+    "pesq>=0.0.4",
+    "pystoi>=0.3.3",
+    "pandas>=1.4.0",
+    "joblib>=1.2.0",
+]
+ml = [
+    "transformers>=4.30.0",
+]
+tts = [
+    "coqui-tts>=0.22.0",
+]
+nlp = [
+    "spacy>=3.0.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -49,6 +72,7 @@ dev = [
     "flake8>=5.0.0",
     "mypy>=1.0.0",
     "pre-commit>=3.0.0",
+    "ruff>=0.1.0",
 ]
 web = [
     "streamlit>=1.28.0",

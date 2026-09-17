@@ -1,6 +1,10 @@
 import numpy as np
 import torch
-from TTS.api import TTS
+
+try:
+    from TTS.api import TTS
+except ImportError:  # pragma: no cover - optional extra [tts]
+    TTS = None
 
 
 class TTSWrapper:
@@ -14,6 +18,11 @@ class TTSWrapper:
     DEFAULT_MODEL = "tts_models/multilingual/multi-dataset/your_tts"
 
     def __init__(self, model_name=DEFAULT_MODEL):
+        if TTS is None:
+            raise ImportError(
+                "extra tts não instalado: instale com `pip install speech-synthesis[tts]` "
+                "para usar o TTSWrapper (Coqui TTS)."
+            )
         self.tts = TTS(model_name)
 
     def synthesize(self, text, speaker_wav=None, speaker=None, language=None):

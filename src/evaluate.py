@@ -160,7 +160,8 @@ class ModelEvaluator:
             checkpoint_path = Path(self.config.evaluation.checkpoint_path)
             if checkpoint_path.exists():
                 logger.info(f"Loading checkpoint: {checkpoint_path}")
-                checkpoint = torch.load(checkpoint_path, map_location=self.device)
+                from .utils import secure_torch_load
+                checkpoint = secure_torch_load(checkpoint_path, map_location=self.device)
                 model.load_state_dict(checkpoint['model_state_dict'])
             else:
                 logger.warning(f"Checkpoint not found: {checkpoint_path}")

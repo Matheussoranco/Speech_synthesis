@@ -17,10 +17,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+import logging
 import soundfile as sf
 import torch
 import torchaudio
 from torch.utils.data import Dataset, DataLoader
+
+logger = logging.getLogger(__name__)
 
 try:
     from omegaconf import DictConfig
@@ -64,6 +67,13 @@ class TTSDataset(Dataset):
         self.samples: List[Dict] = []
         self.speaker2id: Dict[str, int] = {}
         self._load_metadata()
+        if not self.samples:
+            logger.warning(
+                "no usable audio/text pairs found in %s — dataset is empty; "
+                "expected LJSpeech metadata.csv, *.trans.tsv, VCTK speaker "
+                "dirs, or paired .wav/.txt files",
+                self.data_dir,
+            )
 
         # Window for STFT
         self.window = torch.hann_window(self.win_length)
@@ -71,7 +81,11 @@ class TTSDataset(Dataset):
     # ------------------------------------------------------------------
     def _load_metadata(self):
         if not self.data_dir.exists():
-            return
+            raise FileNotFoundError(
+                f"data dir {self.data_dir} does not exist — refusing to build "
+                "an empty dataset silently; point --data to an LJSpeech/VCTK/ "
+                "LibriTTS directory or a flat dir of paired .wav/.txt files"
+            )
 
         # 1. LJSpeech
         meta_csv = self.data_dir / "metadata.csv"
@@ -165,10 +179,15 @@ class TTSDataset(Dataset):
             try:
                 phonemes = self.tp.text_to_phonemes(text)
                 ids = self.tp.phonemes_to_ids(phonemes)
-            except Exception:
-                ids = [ord(c) % 256 for c in text]
+            except Exception as exc:
+                # Sem fallback silencioso: mapeamento byte-level mascararia
+                # texto corrompido como se fosse fonema válido.
+                logger.error("falha ao fonemizar amostra %r: %s", sample.get("wav"), exc)
+                raise ValueError(f"falha ao converter texto em ids (wav={sample.get('wav')!r}): {exc}") from exc
         else:
-            ids = [ord(c) % 256 for c in text]
+            raise ValueError(
+                f"text_processor ausente: não é possível converter texto em ids (wav={sample.get('wav')!r})"
+            )
 
         text_tokens = torch.LongTensor(ids)
 

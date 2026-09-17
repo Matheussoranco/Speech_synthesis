@@ -1075,7 +1075,7 @@ class SynthesizerTrn(nn.Module):
         )
 
         # Import generator from vocoder module
-        from src.vocoder import HiFiGANGenerator
+        from .vocoder import HiFiGANGenerator
         self.dec = HiFiGANGenerator(
             inter_channels, resblock, resblock_kernel_sizes, resblock_dilation_sizes,
             upsample_rates, upsample_initial_channel, upsample_kernel_sizes,
@@ -1103,6 +1103,42 @@ class SynthesizerTrn(nn.Module):
         if n_speakers > 1:
             self.emb_g = nn.Embedding(n_speakers, gin_channels)
 
+        # ECAPA-TDNN speaker embeddings are 192-dim while gin_channels is
+        # typically 256: project instead of crashing on a matmul mismatch.
+        # Lazily applied in _project_g() whenever g.shape[-1 or -2] != gin.
+        if gin_channels not in (0, 192):
+            self.gin_proj = nn.Linear(192, gin_channels)
+        else:
+            self.gin_proj = None  # type: ignore[assignment]
+
+    def _project_g(self, g: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
+        """Map a speaker embedding to ``gin_channels`` when dims disagree."""
+        if g is None or self.gin_channels in (0, None):
+            return g
+        dim = g.shape[1] if g.dim() == 2 else g.shape[0] if g.dim() == 1 else g.shape[-1]
+        # Conv1d conditioning expects (B, gin, 1)/(B, gin, T); Linear path
+        # expects (B, gin).  Project on the channel axis in either layout.
+        if dim == self.gin_channels:
+            return g
+        proj = self.gin_proj
+        if proj is None:
+            # gin_channels != 192/0 without a learned projection (e.g. an old
+            # checkpoint loaded without gin_proj): fall back to zero-pad /
+            # truncate so inference still runs instead of matmul-crashing.
+            if g.dim() == 2:
+                if dim < self.gin_channels:
+                    pad = torch.zeros(
+                        g.shape[0], self.gin_channels - dim, device=g.device, dtype=g.dtype
+                    )
+                    return torch.cat([g, pad], dim=1)
+                return g[:, : self.gin_channels]
+            return g
+        if g.dim() == 3:  # (B, C, T) conditioning layout
+            return proj(g.transpose(1, 2)).transpose(1, 2)
+        if g.dim() == 1:
+            return proj(g.unsqueeze(0)).squeeze(0)
+        return proj(g)
+
     def forward(
         self,
         x: torch.Tensor,
@@ -1116,6 +1152,7 @@ class SynthesizerTrn(nn.Module):
         if self.n_speakers > 1 and sid is not None:
             g = self.emb_g(sid).unsqueeze(-1)
         elif g is not None:
+            g = self._project_g(g)
             g = g.unsqueeze(-1) if g.dim() == 2 else g
 
         # Text encoder
@@ -1203,6 +1240,7 @@ class SynthesizerTrn(nn.Module):
         if self.n_speakers > 1 and sid is not None:
             g = self.emb_g(sid).unsqueeze(-1)
         elif g is not None:
+            g = self._project_g(g)
             g = g.unsqueeze(-1) if g.dim() == 2 else g
 
         x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
@@ -1641,8 +1679,9 @@ def create_model(model_config: Dict[str, Any], model_type: Optional[str] = None)
 
 
 def load_model(checkpoint_path: str, device: str = 'cpu') -> nn.Module:
-    """Load model from checkpoint."""
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    """Load model from checkpoint (weights_only + hash sidecar opcional)."""
+    from .utils import secure_torch_load
+    checkpoint = secure_torch_load(checkpoint_path, map_location=device)
     model_config = checkpoint.get('model_config', {})
     model = create_model(model_config)
     model.load_state_dict(checkpoint['state_dict'])

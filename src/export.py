@@ -361,8 +361,9 @@ class ModelExporter:
         model_factory = ModelFactory(self.config)
         model = model_factory.create_model(self.config.model.type)
         
-        # Load weights
-        checkpoint = torch.load(model_path, map_location=self.device)
+        # Load weights (weights_only + hash sidecar opcional).
+        from .utils import secure_torch_load
+        checkpoint = secure_torch_load(model_path, map_location=self.device)
         if 'model_state_dict' in checkpoint:
             model.load_state_dict(checkpoint['model_state_dict'])
         else:

@@ -63,6 +63,29 @@ DEFAULT_CONFIG = "config.yaml"
 LOGGER = None
 
 
+def _validate_config(config) -> None:
+    """Valida seções obrigatórias com erro claro (falha cedo, não no meio do treino)."""
+    system = config.get('system', None) if hasattr(config, 'get') else getattr(config, 'system', None)
+    if system is None:
+        raise ValueError("config inválida: seção obrigatória ausente: [system]")
+    for key in ('device', 'log_level', 'cache_dir', 'max_workers'):
+        try:
+            has = key in system if hasattr(system, '__contains__') else hasattr(system, key)
+        except Exception:
+            has = False
+        if not has:
+            raise ValueError(f"config inválida: system.{key} ausente")
+    training = config.get('training', None) if hasattr(config, 'get') else getattr(config, 'training', None)
+    if training is not None:
+        for key in ('batch_size', 'epochs', 'learning_rate', 'output_dir'):
+            try:
+                has = key in training if hasattr(training, '__contains__') else hasattr(training, key)
+            except Exception:
+                has = False
+            if not has:
+                raise ValueError(f"config inválida: training.{key} ausente")
+
+
 def setup_global_config(config_path: Optional[str] = None, 
                        log_level: str = "INFO",
                        device: str = "auto",
@@ -83,7 +106,7 @@ def setup_global_config(config_path: Optional[str] = None,
                 'max_workers': 4
             },
             'model': {
-                'type': 'YourTTS',
+                'type': 'VITS2',
                 'checkpoint_path': None
             },
             'web': {
@@ -99,6 +122,8 @@ def setup_global_config(config_path: Optional[str] = None,
         config.system.device = device
     if log_level != "INFO":
         config.system.log_level = log_level
+
+    _validate_config(config)
     
     # Setup logging
     LOGGER = get_logger(config.get('system', {}))

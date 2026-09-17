@@ -29,8 +29,8 @@ from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 from omegaconf import OmegaConf, DictConfig
 
-from src.model import SynthesizerTrn, kl_loss, slice_segments
-from src.vocoder import (
+from .model import SynthesizerTrn, kl_loss, slice_segments
+from .vocoder import (
     HiFiGANGenerator,
     MultiPeriodDiscriminator,
     MultiScaleDiscriminator,
@@ -39,9 +39,10 @@ from src.vocoder import (
     feature_loss,
     mel_spectrogram_loss,
 )
-from src.data import TTSDataset, collate_fn
-from src.text_processor import TextProcessor
-from src.logging_config import get_logger
+from .data import TTSDataset, collate_fn
+from .text_processor import TextProcessor
+from .logging_config import get_logger
+from .utils import secure_torch_load
 
 
 # ---------------------------------------------------------------------------
@@ -325,10 +326,17 @@ class VITS2Trainer:
         }
         p = self.output_dir / f"checkpoint_{tag}.pth"
         torch.save(ckpt, p)
+        try:
+            import hashlib as _hashlib
+            digest = _hashlib.sha256(Path(p).read_bytes()).hexdigest()
+            Path(str(p) + ".sha256").write_text(f"{digest}  {Path(p).name}\n")
+        except Exception:
+            pass
         self.logger.logger.info(f"Saved checkpoint → {p}")
 
     def load_checkpoint(self, path: str):
-        ckpt = torch.load(path, map_location=self.device)
+        # Resume local confiável, mas com weights_only=True + hash opcional.
+        ckpt = secure_torch_load(path, map_location=self.device)
         self.net_g.load_state_dict(ckpt["net_g"])
         self.net_d_mpd.load_state_dict(ckpt["net_d_mpd"])
         self.net_d_msd.load_state_dict(ckpt["net_d_msd"])

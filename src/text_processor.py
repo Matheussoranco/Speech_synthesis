@@ -16,10 +16,25 @@ from phonemizer import phonemize
 from phonemizer.backend import EspeakBackend
 import nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
-import spacy
+try:
+    import spacy  # optional extra [nlp]
+except ImportError:  # pragma: no cover - optional dependency
+    spacy = None
 from unidecode import unidecode
 
 logger = logging.getLogger(__name__)
+
+
+def ensure_resources() -> None:
+    """Baixe recursos NLTK sob demanda (fora do __init__).
+
+    Chamado explicitamente por treino/inferência ou na primeira
+    tokenização, para que importar/construir TextProcessor não faça I/O.
+    """
+    try:
+        nltk.data.find('tokenizers/punkt')
+    except LookupError:
+        nltk.download('punkt')
 
 
 def _ensure_espeak_library() -> bool:
@@ -158,14 +173,11 @@ class TextProcessor:
         # Initialize components
         self._phonemizer = None  # built on first use — see the `phonemizer` property
         self._phonemizer_nopunct = None
+        # Sempre inicializado para evitar AttributeError quando
+        # normalize_numbers=False (métodos _normalize_* assumem o engine).
+        self.inflect_engine = inflect.engine()
         self._init_normalizers()
         self._init_language_specific()
-
-        # Download required NLTK data
-        try:
-            nltk.data.find('tokenizers/punkt')
-        except LookupError:
-            nltk.download('punkt')
 
     @property
     def phonemizer(self):
@@ -190,8 +202,7 @@ class TextProcessor:
     
     def _init_normalizers(self):
         """Initialize text normalizers."""
-        if self.normalize_numbers:
-            self.inflect_engine = inflect.engine()
+        # inflect_engine já inicializado no __init__ (sempre presente).
         
         # Common abbreviations
         self.abbreviations = {
@@ -245,6 +256,10 @@ class TextProcessor:
     
     def _init_language_specific(self):
         """Initialize language-specific components."""
+        self.nlp = None
+        if spacy is None:
+            logger.debug("spacy não instalado (extra [nlp]); NLP desativado.")
+            return
         try:
             if self.language == "en":
                 self.nlp = spacy.load("en_core_web_sm")
@@ -484,13 +499,15 @@ class TextProcessor:
     
     def split_into_sentences(self, text: str) -> List[str]:
         """Split text into sentences."""
+        ensure_resources()
         sentences = sent_tokenize(text)
         return [self.process_text(sentence) for sentence in sentences]
-    
+
     def tokenize_text(self, text: str) -> List[str]:
         """Tokenize processed text into units suitable for TTS."""
         # Process text first
         processed_text = self.process_text(text)
+        ensure_resources()
         
         # Simple word-level tokenization
         tokens = word_tokenize(processed_text)

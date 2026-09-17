@@ -15,12 +15,12 @@ import io
 import base64
 from PIL import Image
 
-# Import local modules
-from src.tts_model import TTSWrapper
-from src.speaker_encoder import SpeakerEncoder
-from src.text_processor import TextProcessor
-from src.logging_config import get_logger
-from src.model import AdvancedTTSModel, load_model
+# Import local modules (relativos ao pacote; TTSWrapper é lazy e exige extra [tts])
+from .tts_model import TTSWrapper
+from .speaker_encoder import SpeakerEncoder
+from .text_processor import TextProcessor
+from .logging_config import get_logger
+from .model import AdvancedTTSModel, load_model
 from omegaconf import OmegaConf
 
 

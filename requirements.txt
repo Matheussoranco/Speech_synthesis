@@ -1,53 +1,57 @@
+# Aligned with pyproject.toml [project.dependencies] (core) +
+# [project.optional-dependencies] (audio/eval/ml/tts/nlp/dev/web/monitoring).
+# Core installs always; optionals via `pip install -e ".[audio,eval,ml,...]"`.
 # ─── Core ────────────────────────────────────────────────────────────────────
-numpy>=1.21.0
-scipy>=1.7.0
-torch>=2.0.0
-torchaudio>=2.0.0
+numpy>=1.21.0,<2.0
+scipy>=1.7.0,<2.0
+torch>=2.0.0,<3.0
+torchaudio>=2.0.0,<3.0
 
 # ─── Audio ───────────────────────────────────────────────────────────────────
-librosa>=0.10.0
-soundfile>=0.12.0
-pydub>=0.25.0
-noisereduce>=2.0.0
+librosa>=0.10.0,<1.0
+soundfile>=0.12.0,<1.0
+pydub>=0.25.0,<1.0
+noisereduce>=2.0.0,<4.0
 
 # ─── Text / Phonemes ─────────────────────────────────────────────────────────
-phonemizer>=3.2.0
+phonemizer>=3.2.0,<4.0
 # espeak-ng must be installed at OS level:
 #   Ubuntu:  sudo apt-get install espeak-ng
 #   macOS:   brew install espeak-ng
 #   Windows: https://github.com/espeak-ng/espeak-ng/releases
-unidecode>=1.3.0
-nltk>=3.7.0
+unidecode>=1.3.0,<2.0
+nltk>=3.7.0,<4.0
+inflect>=6.0.0  # core (pyproject): number/abbreviation normalisation in text_processor
 
 # ─── ML / Training ───────────────────────────────────────────────────────────
-transformers>=4.30.0
-omegaconf>=2.3.0
-tqdm>=4.64.0
+transformers>=4.30.0,<5.0
+omegaconf>=2.3.0,<3.0
+tqdm>=4.64.0,<5.0
 
 # ─── Monitoring ──────────────────────────────────────────────────────────────
-tensorboard>=2.12.0
-wandb>=0.15.0
-loguru>=0.7.0
+tensorboard>=2.12.0,<3.0
+wandb>=0.15.0,<1.0
+loguru>=0.7.0,<1.0
 
 # ─── Web / API ───────────────────────────────────────────────────────────────
-gradio>=4.0.0
-fastapi>=0.100.0
-uvicorn>=0.23.0
+gradio>=4.0.0,<6.0
+fastapi>=0.100.0,<1.0
+uvicorn>=0.23.0,<1.0
 
 # ─── Dev / Test ──────────────────────────────────────────────────────────────
-pytest>=7.0.0
-pytest-cov>=4.0.0
-black>=23.0.0
-ruff>=0.1.0
+pytest>=7.0.0,<9.0
+pytest-cov>=4.0.0,<7.0
+black>=23.0.0,<25.0
+ruff>=0.1.0,<1.0
 
 # ─── Utilities ───────────────────────────────────────────────────────────────
-matplotlib>=3.5.0
-pandas>=1.4.0
-joblib>=1.2.0
+matplotlib>=3.5.0,<4.0
+pandas>=1.4.0,<3.0
+joblib>=1.2.0,<2.0
 
 # ─── Evaluation metrics (optional; imported under try/except in src/evaluate.py) ─
-pesq>=0.0.4
-pystoi>=0.3.3
+pesq>=0.0.4,<1.0
+pystoi>=0.3.3,<1.0
 
 # ─── Coqui-TTS wrapper path (heavy; required only for src/tts_model.py demos) ────
 # Pins its own torch build — install in an isolated env if you use the wrapper:

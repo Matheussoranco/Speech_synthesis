@@ -39,7 +39,7 @@ class TestModelExporter:
     
     @patch('src.export.ModelFactory')
     @patch('src.export.TextProcessor')
-    @patch('torch.load')
+    @patch('src.utils.secure_torch_load')
     def test_load_model_with_state_dict(self, mock_torch_load, mock_text_processor, mock_model_factory):
         """Test model loading with state dict in checkpoint."""
         # Mock model and checkpoint
@@ -58,7 +58,7 @@ class TestModelExporter:
     
     @patch('src.export.ModelFactory')
     @patch('src.export.TextProcessor')
-    @patch('torch.load')
+    @patch('src.utils.secure_torch_load')
     def test_load_model_direct_state_dict(self, mock_torch_load, mock_text_processor, mock_model_factory):
         """Test model loading with direct state dict."""
         # Mock model and checkpoint
