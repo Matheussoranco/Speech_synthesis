@@ -48,11 +48,21 @@ class SpeechSynthesisInterface:
                     self.config.model.checkpoint_path,
                     device=self._get_device()
                 )
-                self.logger.log_model_info(
-                    "Custom TTS Model",
-                    sum(p.numel() for p in self.custom_model.parameters()),
-                    self._get_device()
-                )
+                if getattr(self.custom_model, "infer", None) is None:
+                    # Checkpoint sem API de inferência: esconde a opção
+                    # "Custom Model" da UI em vez de servir áudio Coqui
+                    # rotulado como custom.
+                    self.logger.log_error_with_context(
+                        RuntimeError("checkpoint sem método infer(); opção desabilitada"),
+                        {"component": "model_loading"},
+                    )
+                    self.custom_model = None
+                else:
+                    self.logger.log_model_info(
+                        "Custom TTS Model",
+                        sum(p.numel() for p in self.custom_model.parameters()),
+                        self._get_device()
+                    )
             except Exception as e:
                 self.logger.log_error_with_context(e, {"component": "model_loading"})
         
@@ -209,13 +219,7 @@ class SpeechSynthesisInterface:
             # `extract_embedding` method — the real API is
             # `embed_utterance_numpy(wav, sr)`; the old name raised
             # AttributeError on every voice-cloning request).
-            speaker_embedding = self.speaker_encoder.embed_utterance_numpy(audio_np, sample_rate)
-            
-            # Calculate similarity (placeholder for actual implementation)
-            similarity_score = np.random.uniform(0.6, 0.9)  # Placeholder
-            
-            if similarity_score < similarity_threshold:
-                return None, f"❌ Voice similarity too low ({similarity_score:.2f}). Please try a different reference audio.", {}
+            ref_embedding = self.speaker_encoder.embed_utterance_numpy(audio_np, sample_rate)
             
             # Process text
             processed_text = self.text_processor.process_text(text)
@@ -229,6 +233,18 @@ class SpeechSynthesisInterface:
                 torchaudio.save(temp_ref.name, torch.from_numpy(audio_np).unsqueeze(0), sample_rate)
                 cloned_audio = self.tts_wrapper.synthesize(processed_text, speaker_wav=temp_ref.name)
                 os.unlink(temp_ref.name)
+
+            # Real voice-similarity gate: cosine between the reference
+            # d-vector and the d-vector re-extracted from the cloned output.
+            # (Previously `np.random.uniform(0.6, 0.9)` — a random gate that
+            # accepted/rejected clones by luck instead of measuring anything.)
+            out_embedding = self.speaker_encoder.embed_utterance_numpy(
+                np.asarray(cloned_audio, dtype=np.float32), self._tts_output_sr()
+            )
+            similarity_score = self._cosine_similarity(ref_embedding, out_embedding)
+
+            if similarity_score < similarity_threshold:
+                return None, f"❌ Voice similarity too low ({similarity_score:.2f}). Please try a different reference audio.", {}
             
             # Save to temporary file
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
@@ -254,17 +270,79 @@ class SpeechSynthesisInterface:
             self.logger.log_error_with_context(e, {"text_length": len(text)})
             return None, error_msg, {}
     
+    def _tts_output_sr(self) -> int:
+        """Sample rate of Coqui output (queried, not hardcoded)."""
+        synth = getattr(getattr(self.tts_wrapper, "tts", None), "synthesizer", None)
+        return int(getattr(synth, "output_sample_rate", 22050) or 22050)
+
+    @staticmethod
+    def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+        """Cosine similarity in [-1, 1]; 0.0 when either vector is degenerate."""
+        a = np.asarray(a, dtype=np.float64).ravel()
+        b = np.asarray(b, dtype=np.float64).ravel()
+        denom = float(np.linalg.norm(a) * np.linalg.norm(b))
+        if denom <= 0.0:
+            return 0.0
+        return float(np.clip(np.dot(a, b) / denom, -1.0, 1.0))
+
     def _synthesize_with_custom_model(self, text: str) -> np.ndarray:
-        """Synthesize using custom model (placeholder)."""
-        # This would implement actual custom model inference
-        # For now, fallback to Coqui TTS
-        return self.tts_wrapper.synthesize(text)
-    
+        """Synthesize with the fine-tuned VITS2 checkpoint.
+
+        Real inference path (TTSInferencer protocol): text → phoneme ids →
+        model.infer → waveform. Raises a descriptive error when the loaded
+        checkpoint does not expose `infer` instead of silently returning
+        Coqui audio labelled as "custom".
+        """
+        infer = getattr(self.custom_model, "infer", None)
+        if infer is None or self.custom_model is None:
+            raise RuntimeError(
+                "Custom model is not loaded or does not expose infer(); "
+                "select 'Coqui TTS' instead."
+            )
+        phonemes = self.text_processor.text_to_phonemes(text)
+        ids = self.text_processor.phonemes_to_ids(phonemes)
+        if not ids:
+            raise ValueError(f"no phoneme ids produced for input {text!r:.80}")
+        device = next(self.custom_model.parameters()).device
+        x = torch.LongTensor(ids).unsqueeze(0).to(device)
+        x_lengths = torch.LongTensor([len(ids)]).to(device)
+        with torch.no_grad():
+            wav, _, _ = self.custom_model.infer(x, x_lengths)
+        # infer() já devolve o waveform na taxa nativa do checkpoint
+        # (config.data.sample_rate); sem resample silencioso aqui.
+        return np.asarray(wav.squeeze().detach().cpu().numpy(), dtype=np.float32)
+
     def _apply_audio_effects(self, audio: np.ndarray, speed: float, pitch: float) -> np.ndarray:
-        """Apply speed and pitch effects to audio."""
-        # Placeholder implementation
-        # In practice, would use librosa or similar
-        return audio
+        """Apply speed (time-stretch) and pitch-shift via librosa.
+
+        speed > 1 = faster/shorter, pitch is a linear factor (1.0 = original,
+        internally converted to semitones). Out-of-range or NaN inputs raise
+        ValueError instead of corrupting audio; librosa failures fall back to
+        the unprocessed audio with a logged warning so synthesis still
+        succeeds.
+        """
+        out = np.asarray(audio, dtype=np.float32)
+        try:
+            import librosa as _librosa
+
+            if speed != 1.0:
+                if not np.isfinite(speed) or speed < 0.5 or speed > 2.0:
+                    raise ValueError(f"speed {speed!r} fora do intervalo [0.5, 2.0]")
+                out = _librosa.effects.time_stretch(out, rate=float(speed))
+            if pitch != 1.0:
+                if not np.isfinite(pitch) or pitch < 0.5 or pitch > 2.0:
+                    raise ValueError(f"pitch {pitch!r} fora do intervalo [0.5, 2.0]")
+                n_steps = float(12.0 * np.log2(pitch))
+                out = _librosa.effects.pitch_shift(
+                    out, sr=int(self.config.data.get("sample_rate", 22050)), n_steps=n_steps
+                )
+        except (ValueError, TypeError):
+            raise
+        except Exception as e:
+            self.logger.log_error_with_context(
+                e, {"component": "audio_effects", "speed": speed, "pitch": pitch}
+            )
+        return np.asarray(out, dtype=np.float32)
     
     def _add_silence(self, audio: np.ndarray, silence_duration: float = 0.5) -> np.ndarray:
         """Add silence at the beginning and end of audio."""
