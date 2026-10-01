@@ -1,0 +1,19 @@
+[project]
+name = "speech-synthesis-studio"
+version = "0.1.0"
+description = "VoiceStudio - Local-first voice cloning, TTS, dubbing, and audiobook creation"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=75.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+workspace = true
+members = [
+    "backend",
+    "omnivoice",
+]

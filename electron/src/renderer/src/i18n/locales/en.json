@@ -1,0 +1,222 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "create": "Create",
+    "delete": "Delete",
+    "edit": "Edit",
+    "save": "Save",
+    "close": "Close",
+    "confirm": "Confirm",
+    "retry": "Retry",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "characters": "characters"
+  },
+  "nav": {
+    "clone": "Clone",
+    "design": "Design",
+    "profiles": "Profiles",
+    "gallery": "Gallery",
+    "stories": "Stories",
+    "audiobook": "Audiobook",
+    "dubbing": "Dubbing",
+    "batch": "Batch",
+    "transcribe": "Transcribe",
+    "projects": "Projects",
+    "tools": "Tools",
+    "integrations": "Integrations",
+    "voice": "Voice",
+    "stories_group": "Stories",
+    "dubbing_group": "Dubbing",
+    "tools_group": "Tools"
+  },
+  "status": {
+    "backend": {
+      "running": "Backend running",
+      "stopped": "Backend stopped"
+    }
+  },
+  "loading": {
+    "title": "VoiceStudio",
+    "subtitle": "Starting local backend..."
+  },
+  "error": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred",
+    "details": "Error details",
+    "tryAgain": "Try again",
+    "reload": "Reload"
+  },
+  "clone": {
+    "title": "Voice Cloning",
+    "description": "Clone any voice from a reference audio sample",
+    "scriptLabel": "Script",
+    "scriptPlaceholder": "Enter the text you want to synthesize...",
+    "dropReference": "Drop reference audio here",
+    "dropReferenceDesc": "Or click to browse, record, or select a saved voice",
+    "browse": "Browse",
+    "record": "Record",
+    "clearReference": "Clear reference",
+    "unknownDuration": "Unknown duration",
+    "language": "Language",
+    "speed": "Speed",
+    "steps": "Steps",
+    "cfg": "CFG Scale",
+    "tShift": "Timestep Shift",
+    "duration": "Duration",
+    "auto": "Auto",
+    "posTemp": "Pos Temp",
+    "classTemp": "Class Temp",
+    "layerPenalty": "Layer Penalty",
+    "denoise": "Denoise",
+    "postprocess": "Post-process",
+    "autoPlay": "Auto-play",
+    "showAdvanced": "Show advanced",
+    "hideAdvanced": "Hide advanced",
+    "resetDefaults": "Reset defaults",
+    "generate": "Generate",
+    "preparing": "Preparing...",
+    "elapsed": "Elapsed: {{time}}",
+    "output": "Output",
+    "generated": "Generated {{duration}} with {{engine}}",
+    "playbackError": "Playback failed",
+    "invalidAudio": "Invalid audio file",
+    "referenceTooLong": "Reference audio too long (max 75s)",
+    "referenceTooLongWarning": "Reference audio is very long, may affect quality",
+    "noText": "Please enter text to synthesize",
+    "noReference": "Please provide reference audio or select a saved voice",
+    "lowSimilarity": "Voice similarity too low, try a different reference",
+    "success": "Voice cloned successfully!",
+    "successDesc": "Generated {{duration}} of audio",
+    "cancelled": "Generation cancelled",
+    "failed": "Generation failed"
+  },
+  "design": {
+    "title": "Voice Design",
+    "comingSoon": "Voice design workspace coming soon..."
+  },
+  "dubbing": {
+    "title": "Video Dubbing",
+    "batchTitle": "Batch Dubbing",
+    "comingSoon": "Dubbing workspace coming soon..."
+  },
+  "stories": {
+    "title": "Stories",
+    "comingSoon": "Stories workspace coming soon..."
+  },
+  "audiobook": {
+    "title": "Audiobook",
+    "comingSoon": "Audiobook workspace coming soon..."
+  },
+  "gallery": {
+    "title": "Gallery",
+    "comingSoon": "Gallery workspace coming soon..."
+  },
+  "profiles": {
+    "title": "Voice Profiles",
+    "comingSoon": "Profiles workspace coming soon...",
+    "savedVoices": "Saved Voices",
+    "empty": "No saved voices yet",
+    "add": "Add Voice",
+    "createNew": "Create New Voice",
+    "namePlaceholder": "Voice name",
+    "refTextPlaceholder": "Reference text (what the speaker says in the audio)"
+  },
+  "transcribe": {
+    "title": "Transcribe",
+    "comingSoon": "Transcription workspace coming soon..."
+  },
+  "projects": {
+    "title": "Projects",
+    "comingSoon": "Projects workspace coming soon..."
+  },
+  "tools": {
+    "title": "Tools",
+    "comingSoon": "Tools workspace coming soon..."
+  },
+  "integrations": {
+    "title": "Integrations",
+    "comingSoon": "Integrations workspace coming soon..."
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Configure VoiceStudio preferences",
+    "appearance": "Appearance",
+    "general": "General",
+    "storage": "Storage",
+    "apiKeys": "API Keys",
+    "privacy": "Privacy",
+    "notifications": "Notifications",
+    "advanced": "Advanced",
+    "about": "About",
+    "theme": "Theme",
+    "systemFont": "System Font",
+    "uiScale": "UI Scale",
+    "colorPalette": "Color Palette",
+    "glassMode": "Glass Mode",
+    "glassModeDesc": "Translucent surfaces with backdrop blur",
+    "autoPlayback": "Auto-play generated audio",
+    "autoPlaybackDesc": "Automatically play audio after generation completes",
+    "language": "Language",
+    "autoUpdate": "Auto-update",
+    "autoUpdateDesc": "Automatically check for and install updates",
+    "startMinimized": "Start minimized to tray",
+    "startMinimizedDesc": "Launch VoiceStudio minimized to system tray",
+    "closeToTray": "Close to tray",
+    "closeToTrayDesc": "Minimize to tray instead of closing",
+    "totalUsage": "Total Usage",
+    "profiles": "Profiles",
+    "history": "History",
+    "cache": "Cache",
+    "available": "Available",
+    "clearCache": "Clear Cache",
+    "exportData": "Export Data",
+    "resetAllData": "Reset All Data",
+    "remoteApiDesc": "API key for remote administration UI access",
+    "apiKeyPlaceholder": "Enter API key...",
+    "saveApiKey": "Save API Key",
+    "analytics": "Usage Analytics",
+    "analyticsDesc": "Send anonymous usage statistics to improve VoiceStudio",
+    "crashReports": "Crash Reports",
+    "crashReportsDesc": "Automatically send crash reports for debugging",
+    "checkUpdates": "Check for Updates",
+    "checkUpdatesDesc": "Automatically check for application updates",
+    "notificationsEnabled": "Enable Notifications",
+    "notificationsEnabledDesc": "Show desktop notifications",
+    "generationComplete": "Generation Complete",
+    "generationCompleteDesc": "Notify when audio generation finishes",
+    "errors": "Errors",
+    "errorsDesc": "Notify when errors occur",
+    "updates": "Updates Available",
+    "updatesDesc": "Notify when updates are available",
+    "computeDevice": "Compute Device",
+    "fp16": "FP16 Precision",
+    "fp16Desc": "Use half-precision for faster inference (requires compatible GPU)",
+    "gpuWorkers": "GPU Workers",
+    "gpuTimeout": "GPU Timeout",
+    "cpuTimeout": "CPU Timeout",
+    "logLevel": "Log Level",
+    "advancedWarning": "Changing these settings may affect stability. Restart required for some changes.",
+    "pythonVersion": "Python",
+    "torchVersion": "PyTorch",
+    "electronVersion": "Electron",
+    "reactVersion": "React",
+    "license": "License",
+    "aboutDesc": "Local-first voice cloning, TTS, dubbing, and audiobook creation. Built with Electron, React, and FastAPI."
+  },
+  "generate": {
+    "errors": {
+      "noText": "Please enter text to synthesize",
+      "noReference": "Please provide reference audio or select a saved voice",
+      "referenceTooLong": "Reference audio too long (max 75s)",
+      "lowSimilarity": "Voice similarity too low, try a different reference",
+      "failed": "Generation failed"
+    },
+    "success": "Voice cloned successfully!",
+    "successDesc": "Generated {{duration}} of audio",
+    "cancelled": "Generation cancelled"
+  }
+}
