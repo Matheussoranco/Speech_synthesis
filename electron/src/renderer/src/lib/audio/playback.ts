@@ -1,4 +1,4 @@
-import { useCallback, useRef, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 
 let activeSource: string | null = null
 let activeStop: (() => void) | null = null

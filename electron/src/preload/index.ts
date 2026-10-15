@@ -24,7 +24,7 @@ interface SaveDialogResult {
 }
 
 // Expose secure APIs to renderer
-contextBridge.exposeInMainWorld('voicestudio', {
+if (process.isMainFrame) contextBridge.exposeInMainWorld('voicestudio', {
   // Backend management
   backend: {
     getStatus: (): Promise<BackendStatus> => 
@@ -51,7 +51,7 @@ contextBridge.exposeInMainWorld('voicestudio', {
   
   // App info
   app: {
-    getVersion: (): string => 
+    getVersion: (): Promise<string> => 
       ipcRenderer.invoke('app:getVersion'),
     getPlatform: (): Promise<PlatformInfo> => 
       ipcRenderer.invoke('app:getPlatform'),
@@ -72,7 +72,7 @@ contextBridge.exposeInMainWorld('voicestudio', {
 })
 
 // Also expose a minimal node-like API for things that need it
-contextBridge.exposeInMainWorld('node', {
+if (process.isMainFrame) contextBridge.exposeInMainWorld('node', {
   platform: process.platform,
   arch: process.arch,
   versions: process.versions,
@@ -95,7 +95,7 @@ declare global {
         saveFile: (options: Electron.SaveDialogOptions) => Promise<SaveDialogResult>
       }
       app: {
-        getVersion: () => string
+        getVersion: () => Promise<string>
         getPlatform: () => Promise<PlatformInfo>
       }
       getBackendUrl: () => string
@@ -109,4 +109,4 @@ declare global {
   }
 }
 
-export {}
+

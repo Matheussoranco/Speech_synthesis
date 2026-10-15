@@ -1,9 +1,10 @@
-"
+"""
 Windows-specific subprocess handling to suppress console windows
-"
+"""
 
 import sys
 import subprocess
+import inspect
 
 _original_popen = None
 
@@ -19,21 +20,17 @@ def install() -> None:
     
     _original_popen = subprocess.Popen
     
-    def patched_popen(*args, **kwargs):
-        # Add CREATE_NO_WINDOW flag
-        creationflags = kwargs.get("creationflags", 0)
-        kwargs["creationflags"] = creationflags | subprocess.CREATE_NO_WINDOW
-        return _original_popen(*args, **kwargs)
-    
-    subprocess.Popen = patched_popen
-    # Also patch subprocess.run, call, check_call, etc.
-    for name in ["run", "call", "check_call", "check_output"]:
-        if hasattr(subprocess, name):
-            original = getattr(subprocess, name)
-            def make_wrapper(orig):
-                def wrapper(*args, **kwargs):
-                    creationflags = kwargs.get("creationflags", 0)
-                    kwargs["creationflags"] = creationflags | subprocess.CREATE_NO_WINDOW
-                    return orig(*args, **kwargs)
-                return wrapper
-            setattr(subprocess, name, make_wrapper(original))
+    flag_position = list(inspect.signature(_original_popen).parameters).index("creationflags")
+
+    class QuietPopen(_original_popen):
+        # asyncio subclasses Popen during import. Preserve its class contract.
+        def __init__(self, *args, **kwargs):
+            if len(args) > flag_position:
+                args = list(args)
+                args[flag_position] |= subprocess.CREATE_NO_WINDOW
+            else:
+                kwargs["creationflags"] = kwargs.get("creationflags", 0) | subprocess.CREATE_NO_WINDOW
+            super().__init__(*args, **kwargs)
+
+    # subprocess.run/call/check_* already resolve this class at call time.
+    subprocess.Popen = QuietPopen

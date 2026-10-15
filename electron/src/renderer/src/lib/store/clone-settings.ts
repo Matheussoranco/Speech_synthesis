@@ -1,6 +1,5 @@
-import { createStore } from '@tanstack/store'
-import { persistStore } from '@tanstack/store-persist'
-import { createJSONStorage } from '@tanstack/store-persist'
+import { createStore, useStore } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 
 export interface CloneSettings {
   text: string
@@ -42,19 +41,19 @@ export const DEFAULT_CLONE_SETTINGS: CloneSettings = {
   auto_play: true,
 }
 
-// Create the store with persistence
-const cloneSettingsStore = createStore<CloneSettings>()(DEFAULT_CLONE_SETTINGS)
+const cloneSettingsStore = createStore<CloneSettings>()(persist(
+  () => ({ ...DEFAULT_CLONE_SETTINGS }),
+  {
+    name: 'voicestudio.clone.settings.v1',
+    storage: createJSONStorage(() => localStorage),
+    partialize: state => ({ ...state, text: '' }),
+  },
+))
 
-// Persist to localStorage
-persistStore(cloneSettingsStore, {
-  name: 'voicestudio.clone.settings.v1',
-  storage: createJSONStorage(() => localStorage),
-  partialize: (state) => ({
-    ...state,
-    // Don't persist transient state
-    text: '', // Don't persist the current text
-  }),
-})
+export function useCloneSettings() { return useStore(cloneSettingsStore); }
+export function useCloneSetting<K extends keyof CloneSettings>(key: K) {
+  return useStore(cloneSettingsStore, state => state[key]);
+}
 
 // Selectors
 export const cloneSettingsSelectors = {

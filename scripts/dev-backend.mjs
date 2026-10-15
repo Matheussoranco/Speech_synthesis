@@ -10,9 +10,10 @@ const backendDir = join(__dirname, '..', 'backend')
 
 console.log('[dev-backend] Starting FastAPI backend...')
 
-const child = spawn('uv', ['run', '--project', backendDir, 'uvicorn', 'main:app', '--app-dir', 'backend', '--host', '127.0.0.1', '--port', '3900', '--reload'], {
+const child = spawn('uv', ['run', '--project', backendDir, 'uvicorn', 'main:app', '--app-dir', backendDir, '--host', '127.0.0.1', '--port', '3900', '--reload'], {
   cwd: backendDir,
   stdio: 'inherit',
+  windowsHide: true,
   env: {
     ...process.env,
     PYTHONUNBUFFERED: '1',

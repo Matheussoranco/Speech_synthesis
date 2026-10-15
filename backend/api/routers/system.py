@@ -2,7 +2,7 @@
 System info and health endpoints
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 import platform
@@ -10,6 +10,10 @@ import sys
 import torch
 import psutil
 import time
+import asyncio
+import os
+import shutil
+from pathlib import Path
 
 from core.config import settings
 
@@ -70,6 +74,32 @@ async def health_check():
 
 @router.post("/system/restart-backend")
 async def restart_backend():
-    # This would be called from the Electron main process
-    # For now, just return success
-    return {"success": True, "message": "Restart requested"}
+    raise HTTPException(409, "Restart the owned backend through the desktop application")
+
+def directory_bytes(root: Path) -> int:
+    if not root.is_dir() or root.is_symlink() or getattr(root, "is_junction", lambda: False)():
+        return 0
+    total = 0
+    for directory, dirs, files in os.walk(root, followlinks=False):
+        dirs[:] = [name for name in dirs if not (Path(directory) / name).is_symlink()
+                   and not getattr(Path(directory) / name, "is_junction", lambda: False)()]
+        for name in files:
+            file = Path(directory) / name
+            if not file.is_symlink():
+                try:
+                    total += file.stat().st_size
+                except FileNotFoundError:
+                    pass
+    return total
+
+@router.get("/system/storage")
+async def storage_info():
+    from api.routers.profiles import profiles_db
+    from api.routers.history import history_db
+    audio = Path(settings.audio_output_dir)
+    cache = Path(settings.cache_dir)
+    def measure():
+        return {"audio_bytes": directory_bytes(audio), "cache_bytes": directory_bytes(cache),
+            "disk_free_bytes": shutil.disk_usage(audio if audio.exists() else audio.parent).free,
+            "profile_count": len(profiles_db), "history_count": len(history_db)}
+    return await asyncio.to_thread(measure)

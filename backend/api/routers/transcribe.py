@@ -1,15 +1,15 @@
-"
+"""
 Transcription
-"
+"""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/transcribe", tags=["transcribe"])
 
 @router.post("/generate")
 async def transcribe_audio():
-    return {"status": "started"}
+    raise HTTPException(503, "No real speech-recognition model is configured")
 
 @router.get("/jobs/{job_id}")
 async def get_transcription_job(job_id: str):
-    return {"id": job_id, "status": "completed"}
+    raise HTTPException(404, "Transcription job not found")

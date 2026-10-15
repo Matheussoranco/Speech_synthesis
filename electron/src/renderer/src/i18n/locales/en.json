@@ -1,4 +1,15 @@
 {
+  "recording": {
+    "failed": "The microphone could not be recorded.",
+    "stop": "Stop recording"
+  },
+  "tts": {
+    "title": "Text to speech",
+    "description": "Generate real speech using voices installed on this computer. System voices do not clone a reference voice.",
+    "unavailable": "No supported speech voice is installed on this platform.",
+    "voice": "Voice",
+    "defaultVoice": "Choose a voice for the selected language"
+  },
   "common": {
     "loading": "Loading...",
     "cancel": "Cancel",
@@ -13,7 +24,8 @@
     "success": "Success",
     "warning": "Warning",
     "info": "Info",
-    "characters": "characters"
+    "characters": "characters",
+    "refresh": "Refresh"
   },
   "nav": {
     "clone": "Clone",
@@ -24,6 +36,8 @@
     "audiobook": "Audiobook",
     "dubbing": "Dubbing",
     "batch": "Batch",
+    "single": "Single",
+    "new": "New",
     "transcribe": "Transcribe",
     "projects": "Projects",
     "tools": "Tools",
@@ -41,7 +55,9 @@
   },
   "loading": {
     "title": "VoiceStudio",
-    "subtitle": "Starting local backend..."
+    "subtitle": "Starting local backend...",
+    "backendUnavailable": "The local speech service is unavailable. Check its installation and try again.",
+    "retry": "Try again"
   },
   "error": {
     "title": "Something went wrong",
@@ -92,7 +108,8 @@
     "success": "Voice cloned successfully!",
     "successDesc": "Generated {{duration}} of audio",
     "cancelled": "Generation cancelled",
-    "failed": "Generation failed"
+    "failed": "Generation failed",
+    "modelUnavailable": "Voice cloning needs a real model adapter. Use Tools for speech with installed system voices."
   },
   "design": {
     "title": "Voice Design",
@@ -123,7 +140,14 @@
     "add": "Add Voice",
     "createNew": "Create New Voice",
     "namePlaceholder": "Voice name",
-    "refTextPlaceholder": "Reference text (what the speaker says in the audio)"
+    "refTextPlaceholder": "Reference text (what the speaker says in the audio)",
+    "deleteFailed": "Could not delete voice profile",
+    "sessionNotice": "Profiles are kept for the current backend session. Export metadata in Settings before restarting.",
+    "created": "Voice profile created",
+    "delete": "Delete voice profile",
+    "createFailed": "Could not create voice profile",
+    "referenceRequired": "Choose reference audio before creating a voice profile.",
+    "deleted": "Voice profile deleted"
   },
   "transcribe": {
     "title": "Transcribe",
@@ -205,7 +229,15 @@
     "electronVersion": "Electron",
     "reactVersion": "React",
     "license": "License",
-    "aboutDesc": "Local-first voice cloning, TTS, dubbing, and audiobook creation. Built with Electron, React, and FastAPI."
+    "aboutDesc": "Local-first voice cloning, TTS, dubbing, and audiobook creation. Built with Electron, React, and FastAPI.",
+    "platform": "Platform",
+    "restartBackend": "Restart backend",
+    "capabilityNotice": "Installed Windows voices support standard speech. Cloning, transcription, dubbing and voice design require model adapters and are unavailable in this desktop backend.",
+    "restartFailed": "Backend restart failed",
+    "availableControls": "The theme is saved on this computer. Other appearance controls are not available yet.",
+    "sessionStorageNotice": "Profile and history metadata currently lasts for this backend session. Export it before restarting. Audio files remain on disk. The export contains metadata, not audio files.",
+    "exportFailed": "Export failed",
+    "audioFiles": "Audio files"
   },
   "generate": {
     "errors": {

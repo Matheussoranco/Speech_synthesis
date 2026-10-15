@@ -1,6 +1,6 @@
-"
+"""
 Ensure omnivoice package is importable from source
-"
+"""
 
 import sys
 from pathlib import Path

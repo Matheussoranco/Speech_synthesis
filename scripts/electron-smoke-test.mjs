@@ -1,78 +1,39 @@
-#!/usr/bin/env bun
-// Electron smoke test - verifies the packaged app launches
+// Launch the actual unpacked application and require a rendered, translated UI.
+import { _electron } from 'playwright'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import http from 'node:http'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-import { spawn } from 'child_process'
-import { existsSync } from 'fs'
-import { join } from 'path'
-import { fileURLToPath } from 'url'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const appDir = join(__dirname, '..', 'electron', 'dist')
-
-const installFlag = process.argv.includes('--install')
-
-async function main() {
-  console.log('[smoke-test] Starting Electron smoke test...')
-  
-  const executable = process.platform === 'win32'
-    ? join(appDir, 'VoiceStudio.exe')
-    : process.platform === 'darwin'
-      ? join(appDir, 'VoiceStudio.app', 'Contents', 'MacOS', 'VoiceStudio')
-      : join(appDir, 'VoiceStudio')
-  
-  if (!existsSync(executable)) {
-    console.error('[smoke-test] Executable not found:', executable)
-    process.exit(1)
-  }
-  
-  console.log('[smoke-test] Found executable:', executable)
-  
-  const child = spawn(executable, [], {
-    stdio: 'pipe',
-    env: {
-      ...process.env,
-      VOICESTUDIO_SKIP_BACKEND: '1',
-    },
-  })
-  
-  let output = ''
-  child.stdout?.on('data', (data) => {
-    output += data.toString()
-  })
-  
-  child.stderr?.on('data', (data) => {
-    output += data.toString()
-  })
-  
-  // Wait for startup
-  await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      child.kill()
-      reject(new Error('Smoke test timeout'))
-    }, 30000)
-    
-    child.on('exit', (code) => {
-      clearTimeout(timeout)
-      if (code === 0) {
-        console.log('[smoke-test] App launched and exited cleanly')
-        resolve()
-      } else {
-        console.log('[smoke-test] App exited with code:', code)
-        console.log('[smoke-test] Output:', output)
-        resolve() // Non-zero exit might be expected for quick test
-      }
-    })
-    
-    // Give it a moment to start
-    setTimeout(() => {
-      child.kill('SIGTERM')
-    }, 5000)
-  })
-  
-  console.log('[smoke-test] Smoke test passed!')
-}
-
-main().catch((err) => {
-  console.error('[smoke-test] Failed:', err)
-  process.exit(1)
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'electron', 'release')
+const executablePath = process.platform === 'win32' ? resolve(root, 'win-unpacked/VoiceStudio.exe')
+  : process.platform === 'darwin' ? resolve(root, 'mac/VoiceStudio.app/Contents/MacOS/VoiceStudio')
+  : resolve(root, 'linux-unpacked/voicestudio')
+assert.ok(fs.existsSync(executablePath), 'Build the unpacked desktop application first')
+let application
+const version = JSON.parse(fs.readFileSync(resolve(root, '../package.json'), 'utf8')).version
+const backend = http.createServer((request, response) => {
+  response.setHeader('Content-Type', 'application/json')
+  response.end(JSON.stringify(request.url === '/api/system/info' ? { app_version: version }
+    : request.url === '/api/engines' ? { tts: [], asr: [], diarization: [], translation: [], vocoder: [] } : []))
 })
+await new Promise(resolve => backend.listen(0, '127.0.0.1', resolve))
+try {
+  application = await _electron.launch({ executablePath, env: { ...process.env, VOICESTUDIO_SKIP_BACKEND: '1', OMNIVOICE_PORT: String(backend.address().port) }, timeout: 30000 })
+  const page = await application.firstWindow()
+  const errors = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.locator('textarea').waitFor()
+  for (const route of ['/tools', '/profiles', '/history', '/settings', '/clone']) {
+    await page.goto('voicestudio://voicestudio' + route)
+    await page.locator('nav a[href="/tools"]').waitFor()
+    await page.locator('h1').first().waitFor()
+  }
+  assert.deepEqual(errors, [])
+  console.log('Packaged desktop rendered all smoke routes without JavaScript errors against a controlled local smoke service; real backend deliberately skipped.')
+} finally {
+  if (application) await application.close()
+  backend.closeAllConnections()
+  await new Promise(resolve => backend.close(resolve))
+}

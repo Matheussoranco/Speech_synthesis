@@ -8,6 +8,8 @@ export interface BackendStatus {
 }
 
 let currentStatus: BackendStatus = { running: false, url: '', version: '' }
+let lastError: Error | null = null
+let checked = false
 let subscribers = new Set<() => void>()
 
 function notify() {
@@ -16,11 +18,14 @@ function notify() {
 
 async function pollStatus() {
   try {
-    const status = await apiJson<BackendStatus>('/system/info')
+    const status = await apiJson<{ app_version: string }>('/system/info')
     currentStatus = { running: true, url: '', version: status.app_version || '' }
-  } catch {
+    lastError = null
+  } catch (error) {
     currentStatus = { running: false, url: '', version: '' }
+    lastError = error instanceof Error ? error : new Error('Backend unavailable')
   }
+  checked = true
   notify()
 }
 
@@ -60,8 +65,8 @@ export function useBackendStatus(): { data: BackendStatus | undefined; error: Er
   const status = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   return {
     data: status.running ? status : undefined,
-    error: null,
-    isLoading: !status.running && status.version === '',
+    error: lastError,
+    isLoading: !checked,
   }
 }
 

@@ -1,12 +1,12 @@
-"
+"""
 Generation history
-"
+"""
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 router = APIRouter(tags=["history"])
 
@@ -18,7 +18,7 @@ class HistoryItem(BaseModel):
     duration: float
     language: str
     engine: str
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: str
     starred: bool = False
 
@@ -60,7 +60,7 @@ def add_history_entry(
     duration: float,
     language: str,
     engine: str,
-    metadata: Dict[str, Any] = {},
+    metadata: Optional[Dict[str, Any]] = None,
 ):
     item = HistoryItem(
         id=str(uuid.uuid4()),
@@ -70,8 +70,8 @@ def add_history_entry(
         duration=duration,
         language=language,
         engine=engine,
-        metadata=metadata,
-        created_at=datetime.utcnow().isoformat(),
+        metadata=metadata or {},
+        created_at=datetime.now(UTC).isoformat(),
     )
     history_db.insert(0, item)
     # Keep only last 1000 entries

@@ -5,17 +5,17 @@
   "private": true,
   "packageManager": "bun@1.4.2",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "electron-vite dev --config electron-vite.config.ts",
     "dev:web": "vite --config vite.config.web.ts",
-    "build": "electron-vite build && bun run build:web",
+    "build": "electron-vite build --config electron-vite.config.ts && bun run build:web",
     "build:web": "vite build --config vite.config.web.ts",
-    "typecheck": "tsgo --noEmit",
-    "lint": "vp lint",
-    "format": "vp fmt",
-    "test": "vp test",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src tests electron-vite.config.ts vite.config.web.ts vitest.config.ts electron-builder.config.mjs postcss.config.js",
+    "format": "oxfmt",
+    "test": "vitest run",
     "start": "electron .",
-    "dist": "electron-builder",
-    "dist:dir": "electron-builder --dir",
+    "dist": "node tests/packaging-contract.mjs && electron-builder --config electron-builder.config.mjs",
+    "dist:dir": "node tests/packaging-contract.mjs && electron-builder --config electron-builder.config.mjs --dir",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -25,7 +25,6 @@
     "@tanstack/react-query": "^5.0.0",
     "@tanstack/react-router": "^1.0.0",
     "@tanstack/store": "^0.5.0",
-    "@tanstack/virtual": "^3.0.0",
     "i18next": "^24.0.0",
     "react-i18next": "^15.0.0",
     "sonner": "^2.0.0",
@@ -35,25 +34,33 @@
     "tailwind-merge": "^2.0.0",
     "zustand": "^5.0.0",
     "axios": "^1.7.0",
-    "ws": "^8.0.0"
+    "ws": "^8.0.0",
+    "@tanstack/react-virtual": "^3.0.0"
   },
   "devDependencies": {
     "electron": "^44.0.0",
-    "electron-vite": "^6.0.0",
-    "electron-builder": "^25.0.0",
-    "@vitejs/plugin-react": "^4.3.0",
-    "vite": "^8.0.0",
-    "typescript": "^6.0.0",
-    "tsgo": "^1.0.0",
-    "vitest": "^3.0.0",
-    "oxlint": "^0.15.0",
-    "oxfmt": "^0.15.0",
+    "electron-vite": "^5.0.0",
+    "electron-builder": "^26.15.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "vite": "^7.3.7",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.3",
+    "oxlint": "^1.87.0",
+    "oxfmt": "^0.72.0",
     "tailwindcss": "^4.0.0",
     "postcss": "^8.4.0",
     "autoprefixer": "^10.4.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/node": "^22.0.0",
-    "@types/ws": "^8.5.0"
+    "@types/ws": "^8.5.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tanstack/react-query-devtools": "^5.101.0",
+    "jsdom": "^29.1.1"
+  },
+  "type": "module",
+  "main": "dist/main/index.cjs",
+  "engines": {
+    "node": "^22.13.0 || ^24.0.0 || >=26.0.0"
   }
 }

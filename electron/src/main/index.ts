@@ -1,59 +1,44 @@
-import { app, BrowserWindow, ipcMain, protocol, net, shell, dialog } from 'electron'
-import { join, dirname } from 'path'
-import { fileURLToPath } from 'url'
+import { app, BrowserWindow, ipcMain, protocol, shell, dialog } from 'electron'
+import { join } from 'path'
 import { spawn, ChildProcess } from 'child_process'
-import { createRequire } from 'module'
 import fs from 'fs'
 
-const require = createRequire(import.meta.url)
-const __dirname = dirname(fileURLToPath(import.meta.url))
+import metadata from '../../package.json'
+import { appUrl, rendererPath, realRendererFile, externalUrl, trustedRendererUrl, backendHeaders, nativePath, dialogOptions } from './boundaries'
 
 // App version from package.json
-const APP_VERSION = require('../../../package.json').version
+const APP_VERSION = metadata.version
 
 // Configuration
-const BACKEND_PORT = process.env.OMNIVOICE_PORT || 3900
+const BACKEND_PORT = Number(process.env.OMNIVOICE_PORT || 3900)
+if (!Number.isInteger(BACKEND_PORT) || BACKEND_PORT < 1 || BACKEND_PORT > 65535) throw new Error('Invalid backend port')
 const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`
 const STARTUP_BUDGET_S = parseInt(process.env.OMNIVOICE_STARTUP_BUDGET_S || '300', 10)
+if (!Number.isFinite(STARTUP_BUDGET_S) || STARTUP_BUDGET_S <= 0) throw new Error('Invalid startup budget')
 const SKIP_BACKEND = process.env.VOICESTUDIO_SKIP_BACKEND === '1'
 
 let backendProcess: ChildProcess | null = null
 let mainWindow: BrowserWindow | null = null
 let isQuitting = false
 
-// Secure the backend drain file descriptor early
-try {
-  const { secure_backend_drain_fd } = await import('../core/contained_subprocess.js')
-  secure_backend_drain_fd()
-} catch {}
-
-// Windows: suppress console windows for child processes
-if (process.platform === 'win32') {
-  try {
-    const { install } = await import('../core/win_subprocess.js')
-    install()
-  } catch {}
-}
-
-// Disable Triton on Windows
-if (process.platform === 'win32') {
-  process.env.TORCH_COMPILE_DISABLE = '1'
-  process.env.TORCHDYNAMO_DISABLE = '1'
-  process.env.TORCHINDUCTOR_DISABLE = '1'
-}
-
-// Ensure omnivoice is importable
-try {
-  const { ensure_omnivoice_importable } = await import('../core/omnivoice_path.js')
-  ensure_omnivoice_importable(join(__dirname, '..', '..', 'backend'))
-} catch {}
+// Python backend/main.py owns its descriptor and Windows subprocess setup.
+// The desktop process owns the child lifetime below.
+const DEVELOPMENT_URL = process.env.ELECTRON_RENDERER_URL
+protocol.registerSchemesAsPrivileged([{ scheme: 'voicestudio', privileges: {
+  standard: true, secure: true, supportFetchAPI: true, stream: true,
+} }])
 
 // ── App protocol for renderer ──────────────────────────────────────────────
 const APP_PROTOCOL = 'voicestudio'
 
 function setupAppProtocol() {
   protocol.handle(APP_PROTOCOL, async (request) => {
-    const url = new URL(request.url)
+    const url = appUrl(request.url)
+    if (!url) return new Response('Not found', { status: 404 })
+    const initiatorOrigin = (request as Request & { initiatorOrigin?: string }).initiatorOrigin
+    if (initiatorOrigin !== undefined && !trustedRendererUrl(initiatorOrigin, DEVELOPMENT_URL)) {
+      return new Response('Forbidden', { status: 403 })
+    }
     const pathname = url.pathname
     
     // Proxy /api/* to backend
@@ -67,14 +52,7 @@ function setupAppProtocol() {
       try {
         const response = await fetch(backendReqUrl, {
           method: request.method,
-          headers: {
-            'Content-Type': 'application/json',
-            ...Object.fromEntries(
-              Object.entries(request.headers).filter(([k]) => 
-                !['host', 'connection', 'content-length'].includes(k.toLowerCase())
-              )
-            ),
-          },
+          headers: backendHeaders(request.headers),
           body: request.method !== 'GET' && request.method !== 'HEAD' 
             ? await request.arrayBuffer() 
             : undefined,
@@ -88,7 +66,7 @@ function setupAppProtocol() {
           statusText: response.statusText,
           headers: response.headers,
         })
-      } catch (e) {
+      } catch {
         clearTimeout(timeout)
         return new Response(JSON.stringify({ error: 'Backend unavailable' }), {
           status: 503,
@@ -97,31 +75,21 @@ function setupAppProtocol() {
       }
     }
     
-    // Serve static renderer files
-    let filePath = join(__dirname, '..', 'renderer', pathname === '/' ? 'index.html' : pathname.slice(1))
-    
-    // Security: prevent directory traversal
-    filePath = filePath.replace(/\.\./g, '')
-    if (!filePath.startsWith(join(__dirname, '..', 'renderer'))) {
-      return new Response('Not found', { status: 404 })
-    }
-    
+    const rendererRoot = join(__dirname, '..', 'renderer')
+    let target = rendererPath(rendererRoot, request.url)
+    if (!target) return new Response('Not found', { status: 404 })
     try {
-      const stat = fs.statSync(filePath)
-      if (stat.isDirectory()) {
-        filePath = join(filePath, 'index.html')
-      }
-      const content = fs.readFileSync(filePath)
-      const mime = getMimeType(filePath)
-      return new Response(content, { headers: { 'Content-Type': mime } })
+      if (fs.statSync(target).isDirectory()) target = join(target, 'index.html')
     } catch {
-      // Fallback to index.html for SPA routing
-      try {
-        const content = fs.readFileSync(join(__dirname, '..', 'renderer', 'index.html'))
-        return new Response(content, { headers: { 'Content-Type': 'text/html' } })
-      } catch {
-        return new Response('Not found', { status: 404 })
-      }
+      // Existing SPA routes load the entry point; unsafe paths never reach this.
+      target = join(rendererRoot, 'index.html')
+    }
+    const file = realRendererFile(rendererRoot, target)
+    if (!file) return new Response('Not found', { status: 404 })
+    try {
+      return new Response(fs.readFileSync(file), { headers: { 'Content-Type': getMimeType(file) } })
+    } catch {
+      return new Response('Not found', { status: 404 })
     }
   })
 }
@@ -153,32 +121,33 @@ function getMimeType(filePath: string): string {
 
 // ── Backend management ─────────────────────────────────────────────────────
 async function probeBackend(): Promise<boolean> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 2000)
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 2000)
-    const response = await fetch(`${BACKEND_URL}/system/info`, { signal: controller.signal })
-    clearTimeout(timeout)
+    const response = await fetch(`${BACKEND_URL}/api/system/info`, { signal: controller.signal })
     if (response.ok) {
       const data = await response.json()
       return data.app_version === APP_VERSION
     }
-  } catch {}
+  } catch {} finally { clearTimeout(timeout) }
   return false
 }
 
 function buildBackendArgv(): string[] {
-  const backendDir = join(__dirname, '..', '..', 'backend')
+  const backendDir = app.isPackaged ? join(process.resourcesPath, 'backend') : join(__dirname, '..', '..', '..', 'backend')
   const pythonCmd = process.env.OMNIVOICE_BACKEND_CMD 
     ? JSON.parse(process.env.OMNIVOICE_BACKEND_CMD)
-    : ['uv', 'run', '--project', backendDir, 'uvicorn', 'main:app', '--app-dir', 'backend', '--host', '127.0.0.1', '--port', String(BACKEND_PORT)]
+    : ['uv', 'run', '--project', backendDir, 'uvicorn', 'main:app', '--app-dir', backendDir, '--host', '127.0.0.1', '--port', String(BACKEND_PORT)]
+  if (!Array.isArray(pythonCmd) || !pythonCmd.length || pythonCmd.some(value =>
+      typeof value !== 'string' || !value || value.includes('\u0000'))) throw new Error('Invalid backend command')
   return pythonCmd
 }
 
 function spawnBackend(): ChildProcess {
   const argv = buildBackendArgv()
-  const backendDir = join(__dirname, '..', '..', 'backend')
+  const backendDir = app.isPackaged ? join(process.resourcesPath, 'backend') : join(__dirname, '..', '..', '..', 'backend')
   
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     PYTHONUNBUFFERED: '1',
     PYTHONUTF8: '1',
@@ -224,12 +193,12 @@ function spawnBackend(): ChildProcess {
     if (code === 78) {
       console.log('[backend] Port in use - backend already running?')
     }
-    backendProcess = null
+    if (backendProcess === child) backendProcess = null
   })
   
   child.on('error', (err) => {
     console.error('[backend] spawn error:', err)
-    backendProcess = null
+    if (backendProcess === child) backendProcess = null
   })
   
   // Never write to stdin, never end it - closing it is the liveness signal
@@ -261,7 +230,7 @@ async function ensureBackend(): Promise<void> {
   const startTime = Date.now()
   const budgetMs = STARTUP_BUDGET_S * 1000
   
-  while (Date.now() - startTime < budgetMs) {
+  while (!isQuitting && Date.now() - startTime < budgetMs) {
     await new Promise(r => setTimeout(r, 500))
     if (await probeBackend()) {
       console.log('[main] Backend ready')
@@ -276,33 +245,34 @@ async function ensureBackend(): Promise<void> {
 }
 
 async function killBackend(): Promise<void> {
-  if (!backendProcess) return
-  
-  console.log('[main] Stopping backend...')
-  
-  if (process.platform === 'win32') {
-    // Windows: taskkill /T /F
-    try {
-      const { spawn } = await import('child_process')
-      await new Promise<void>((resolve) => {
-        const killer = spawn('taskkill', ['/pid', String(backendProcess!.pid), '/T', '/F'])
-        killer.on('exit', () => resolve())
-      })
-    } catch {}
-  } else {
-    // POSIX: kill process group
-    try {
-      if (backendProcess.pid) {
-        process.kill(-backendProcess.pid, 'SIGTERM')
-        await new Promise(r => setTimeout(r, 2000))
-        try { process.kill(-backendProcess.pid!, 'SIGKILL') } catch {}
-      }
-    } catch {}
-  }
-  
-  // Close stdin as liveness signal
-  try { backendProcess.stdin?.end() } catch {}
+  const child = backendProcess
+  if (!child) return
   backendProcess = null
+  const pid = child.pid
+  try {
+    if (pid && process.platform === 'win32') {
+      await new Promise<void>((resolve) => {
+        const killer = spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { windowsHide: true })
+        killer.once('exit', () => resolve())
+        killer.once('error', () => resolve())
+      })
+    } else if (pid) {
+      try { process.kill(-pid, 'SIGTERM') } catch {}
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      if (child.exitCode === null && child.signalCode === null) {
+        try { process.kill(-pid, 'SIGKILL') } catch {}
+      }
+    }
+  } finally {
+    child.stdin?.end()
+  }
+}
+
+let backendOperation: Promise<unknown> = Promise.resolve()
+function backendSerial<T>(operation: () => Promise<T>): Promise<T> {
+  const next = backendOperation.then(operation, operation)
+  backendOperation = next.catch(() => {})
+  return next
 }
 
 // ── Window creation ────────────────────────────────────────────────────────
@@ -319,8 +289,8 @@ function createWindow(): BrowserWindow {
       height: 36,
     },
     webPreferences: {
-      preload: join(__dirname, '..', 'preload', 'index.js'),
-      sandbox: false,
+      preload: join(__dirname, '..', 'preload', 'index.cjs'),
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: true,
@@ -339,8 +309,8 @@ function createWindow(): BrowserWindow {
   })
   
   // Load the app
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.loadURL('http://localhost:3902')
+  if (DEVELOPMENT_URL && trustedRendererUrl(DEVELOPMENT_URL, DEVELOPMENT_URL)) {
+    mainWindow.loadURL(DEVELOPMENT_URL)
     mainWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
     mainWindow.loadURL(`${APP_PROTOCOL}://voicestudio/`)
@@ -348,55 +318,76 @@ function createWindow(): BrowserWindow {
   
   // Handle external links
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    const safe = externalUrl(url)
+    if (safe) void shell.openExternal(safe).catch(console.error)
     return { action: 'deny' }
   })
   
+  const guardNavigation = (event: Electron.Event & { url: string }) => {
+    if (!trustedRendererUrl(event.url, DEVELOPMENT_URL)) event.preventDefault()
+  }
+  mainWindow.webContents.on('will-frame-navigate', guardNavigation)
+  mainWindow.webContents.on('will-redirect', guardNavigation)
   return mainWindow
 }
 
 // ── IPC Handlers ───────────────────────────────────────────────────────────
 function setupIpc() {
+  const handle: typeof ipcMain.handle = (channel, listener) => {
+    ipcMain.handle(channel, (event, ...args) => {
+      if (!mainWindow || event.sender !== mainWindow.webContents ||
+          !event.senderFrame || event.senderFrame !== mainWindow.webContents.mainFrame ||
+          !trustedRendererUrl(event.senderFrame.url, DEVELOPMENT_URL)) {
+        throw new Error('Untrusted desktop request')
+      }
+      return listener(event, ...args)
+    })
+  }
   // Backend status
-  ipcMain.handle('backend:status', async () => {
+  handle('backend:status', async () => {
     const running = await probeBackend()
     return { running, url: BACKEND_URL, version: APP_VERSION }
   })
   
   // Restart backend
-  ipcMain.handle('backend:restart', async () => {
-    await killBackend()
-    await ensureBackend()
+  handle('backend:restart', async () => {
+    await backendSerial(async () => {
+      if (isQuitting) throw new Error('Application is quitting')
+      await killBackend()
+      await ensureBackend()
+    })
     return { success: true }
   })
   
   // Open external URL
-  ipcMain.handle('shell:openExternal', async (_, url: string) => {
-    await shell.openExternal(url)
+  handle('shell:openExternal', async (_, url: string) => {
+    const safe = externalUrl(url)
+    if (!safe) throw new Error('Unsupported external URL')
+    await shell.openExternal(safe)
   })
   
   // Show item in folder
-  ipcMain.handle('shell:showItemInFolder', async (_, path: string) => {
-    shell.showItemInFolder(path)
+  handle('shell:showItemInFolder', async (_, path: string) => {
+    shell.showItemInFolder(nativePath(path))
   })
   
   // Open file dialog
-  ipcMain.handle('dialog:openFile', async (_, options: Electron.OpenDialogOptions) => {
-    const result = await dialog.showOpenDialog(mainWindow!, options)
+  handle('dialog:openFile', async (_, options: Electron.OpenDialogOptions) => {
+    const result = await dialog.showOpenDialog(mainWindow!, dialogOptions(options))
     return result
   })
   
   // Save file dialog
-  ipcMain.handle('dialog:saveFile', async (_, options: Electron.SaveDialogOptions) => {
-    const result = await dialog.showSaveDialog(mainWindow!, options)
+  handle('dialog:saveFile', async (_, options: Electron.SaveDialogOptions) => {
+    const result = await dialog.showSaveDialog(mainWindow!, dialogOptions(options))
     return result
   })
   
   // Get app version
-  ipcMain.handle('app:getVersion', () => APP_VERSION)
+  handle('app:getVersion', () => APP_VERSION)
   
   // Get platform info
-  ipcMain.handle('app:getPlatform', () => ({
+  handle('app:getPlatform', () => ({
     platform: process.platform,
     arch: process.arch,
     versions: process.versions,
@@ -404,21 +395,19 @@ function setupIpc() {
 }
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
-app.on('window-all-closed', async () => {
-  if (process.platform !== 'darwin') {
-    isQuitting = true
-    await killBackend()
-    app.quit()
-  }
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', async () => {
+app.on('before-quit', event => {
+  if (isQuitting) return
+  event.preventDefault()
   isQuitting = true
-  await killBackend()
+  void backendSerial(killBackend).finally(() => app.quit())
 })
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
+  if (!isQuitting && BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   }
 })
@@ -428,8 +417,8 @@ app.whenReady().then(async () => {
   setupIpc()
   
   try {
-    await ensureBackend()
-    createWindow()
+    await backendSerial(ensureBackend)
+    if (!isQuitting) createWindow()
   } catch (err) {
     console.error('[main] Failed to start:', err)
     dialog.showErrorBox('VoiceStudio Startup Error', 

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { queryKeys } from '../lib/api/query'
-import { getEngines, getSystemInfo, type EnginesResponse, type EngineInfo } from '../lib/api/engines'
+import { getEngines, getSystemInfo } from '../lib/api/engines'
 
 export function useEngines() {
   const { data, isLoading, error, refetch } = useQuery({
@@ -10,7 +10,6 @@ export function useEngines() {
   })
   
   const engines = data || { tts: [], asr: [], diarization: [], translation: [], vocoder: [] }
-  const allEngines = [...engines.tts, ...engines.asr, ...engines.diarization, ...engines.translation, ...engines.vocoder]
   const anyTtsReady = engines.tts.some(e => e.status === 'available')
   const activeTts = engines.tts.find(e => e.status === 'available') || null
   

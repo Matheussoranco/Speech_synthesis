@@ -5,12 +5,12 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   main: {
-    plugins: [tailwindcss()],
     build: {
+      outDir: 'dist/main',
       lib: {
         entry: 'src/main/index.ts',
         formats: ['cjs'],
-        fileName: 'index',
+        fileName: () => 'index.cjs',
       },
       rollupOptions: {
         external: ['electron', 'electron-store', 'ws', 'child_process', 'fs', 'path', 'url', 'os', 'crypto'],
@@ -18,12 +18,12 @@ export default defineConfig({
     },
   },
   preload: {
-    plugins: [tailwindcss()],
     build: {
+      outDir: 'dist/preload',
       lib: {
         entry: 'src/preload/index.ts',
         formats: ['cjs'],
-        fileName: 'index',
+        fileName: () => 'index.cjs',
       },
       rollupOptions: {
         external: ['electron'],
@@ -31,6 +31,8 @@ export default defineConfig({
     },
   },
   renderer: {
+    root: resolve(__dirname, 'src/renderer'),
+    base: '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
@@ -39,7 +41,7 @@ export default defineConfig({
       },
     },
     build: {
-      outDir: 'dist/renderer',
+      outDir: resolve(__dirname, 'dist/renderer'),
     },
     server: {
       port: 3902,

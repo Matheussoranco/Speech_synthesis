@@ -138,9 +138,7 @@ async def handle_list_voices(params: Dict[str, Any]) -> CallToolResult:
         if engine.status == "available":
             voices.append(f"{engine.id}: {engine.name}")
     return CallToolResult(
-        content=[TextContent(text="Available voices:
-" + "
-".join(voices) if voices else "No voices available")],
+        content=[TextContent(text="Available voices:\n" + "\n".join(voices) if voices else "No voices available")],
         isError=False,
     )
 
@@ -163,9 +161,7 @@ async def handle_list_voice_profiles(params: Dict[str, Any]) -> CallToolResult:
     from api.routers.profiles import list_profiles
     profiles = await list_profiles()
     return CallToolResult(
-        content=[TextContent(text="Saved profiles:
-" + "
-".join(f"{p.id}: {p.name}" for p in profiles) if profiles else "No profiles")],
+        content=[TextContent(text="Saved profiles:\n" + "\n".join(f"{p.id}: {p.name}" for p in profiles) if profiles else "No profiles")],
         isError=False,
     )
 
@@ -247,15 +243,11 @@ async def mcp_endpoint(request: Request):
 async def mcp_sse():
     """SSE endpoint for MCP (for clients that prefer SSE)"""
     async def event_stream():
-        yield "data: {"jsonrpc":"2.0","method":"notifications/initialized"}
-
-"
+        yield 'data: {"jsonrpc":"2.0","method":"notifications/initialized"}\n\n'
         # Keep alive
         while True:
             await asyncio.sleep(30)
-            yield ": keepalive
-
-"
+            yield ": keepalive\n\n"
     
     return StreamingResponse(
         event_stream(),

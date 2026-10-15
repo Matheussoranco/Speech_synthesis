@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { queryClient, queryKeys } from '../lib/api/query'
-import { listHistory, clearHistory, deleteHistoryItem, setHistoryStarred, type HistoryItem } from '../lib/api/history'
+import { queryKeys } from '../lib/api/query'
+import { listHistory, clearHistory, deleteHistoryItem, setHistoryStarred } from '../lib/api/history'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 

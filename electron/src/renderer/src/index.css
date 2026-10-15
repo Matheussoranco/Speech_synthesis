@@ -1,8 +1,13 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   /* VoiceStudio color palette */
   --color-primary: #6366f1;
+  --color-primary-foreground: #ffffff;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-warning-foreground: #0f172a;
   --color-primary-hover: #4f46e5;
   --color-primary-light: #e0e7ff;
   --color-secondary: #8b5cf6;
@@ -78,10 +83,12 @@
 }
 
 /* Base styles */
+@layer base {
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
 }
 
 html {

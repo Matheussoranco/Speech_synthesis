@@ -35,10 +35,7 @@ export async function createProfile(input: CreateProfileInput): Promise<Profile>
   formData.append('instruct', input.instruct)
   formData.append('language', input.language)
   
-  return apiJson<Profile>('/profiles', {
-    method: 'POST',
-    body: formData,
-  })
+  return apiFormData<Profile>('/profiles', formData)
 }
 
 export async function deleteProfile(id: string): Promise<void> {
@@ -49,9 +46,13 @@ export async function getProfile(id: string): Promise<Profile> {
   return apiJson<Profile>(`/profiles/${encodeURIComponent(id)}`)
 }
 
-export async function updateProfile(id: string, updates: Partial<CreateProfileInput>): Promise<Profile> {
+export async function updateProfile(id: string, updates: Partial<Pick<CreateProfileInput, 'name' | 'ref_text' | 'instruct' | 'language'>>): Promise<Profile> {
+  const formData = new FormData()
+  for (const [key, value] of Object.entries(updates)) {
+    if (value !== undefined) formData.append(key, value)
+  }
   return apiJson<Profile>(`/profiles/${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    body: JSON.stringify(updates),
+    body: formData,
   })
 }

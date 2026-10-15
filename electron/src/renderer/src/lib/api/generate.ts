@@ -64,9 +64,8 @@ export async function generateClone(
     formData.append('ref_audio_path', input.ref_audio_path)
   }
   
-  return apiJson<GenerateResult>('/generate/clone', {
+  return apiFormData<GenerateResult>('/generate/clone', formData, {
     method: 'POST',
-    body: formData,
     signal: opts?.signal,
   })
 }
@@ -94,11 +93,12 @@ export async function generateTTS(input: {
   language: string
   speed?: number
   pitch?: number
-}): Promise<GenerateResult> {
-  return apiJson<GenerateResult>('/generate/tts', {
-    method: 'POST',
-    body: JSON.stringify(input),
-  })
+}, options?: { signal?: AbortSignal }): Promise<GenerateResult> {
+  const form = new FormData()
+  for (const [key, value] of Object.entries(input)) {
+    if (value !== undefined) form.append(key, String(value))
+  }
+  return apiFormData<GenerateResult>('/generate/tts', form, { signal: options?.signal })
 }
 
 export async function generateDubbing(input: {

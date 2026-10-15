@@ -5,15 +5,21 @@ description = "VoiceStudio - Local-first voice cloning, TTS, dubbing, and audiob
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.30,<1",
+    "pydantic-settings>=2.2,<3",
+    "python-multipart>=0.0.20,<1",
+    "psutil>=5.9,<8",
+    "torch>=2.0,<3",
+]
 
 [build-system]
 requires = ["setuptools>=75.0.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.uv]
-workspace = true
-members = [
-    "backend",
-    "omnivoice",
-]
+[tool.setuptools]
+py-modules = ["main", "mcp_server"]
+
+[tool.setuptools.packages.find]
+include = ["api*", "core*", "services*", "mcp_shim*"]

@@ -1,5 +1,6 @@
-import { ReactNode, useState, useEffect } from 'react'
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import type { LucideIcon } from 'lucide-react'
+import { ReactNode, useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { 
   Mic, 
@@ -7,7 +8,6 @@ import {
   Film, 
   BookOpen, 
   Headphones, 
-  FolderOpen, 
   User, 
   Settings, 
   Mic2, 
@@ -16,27 +16,15 @@ import {
   Plug,
   ChevronLeft,
   ChevronRight,
-  Moon,
-  Sun,
   Monitor,
   Layers,
-  Volume2,
   Music,
-  Zap,
   Globe,
-  Database,
-  Cloud,
-  Key,
-  Shield,
-  Bell,
-  HelpCircle,
-  Menu,
-  X,
-  Home,
   Layers as LayersIcon,
 } from 'lucide-react'
 import { useBackendStatus } from '../hooks/use-backend-status'
 import { clsx } from 'clsx'
+import { useTheme } from '../hooks/use-theme'
 
 const navigation = [
   { group: 'Voice', items: [
@@ -62,7 +50,7 @@ const navigation = [
 ]
 
 function NavItem({ to, label, Icon, badge, isActive, onClick }: { 
-  to: string; label: string; Icon: React.ComponentType<{ size?: number }>; badge?: string | null; isActive: boolean; onClick?: () => void 
+  to: string; label: string; Icon: LucideIcon; badge?: string | null; isActive: boolean; onClick?: () => void 
 }) {
   return (
     <NavLink
@@ -97,6 +85,7 @@ function NavItem({ to, label, Icon, badge, isActive, onClick }: {
 function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { t } = useTranslation()
   const location = useLocation()
+  const navigate = useNavigate()
   const backendStatus = useBackendStatus()
   
   return (
@@ -185,6 +174,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
         {/* Theme & Settings row */}
         <div className={clsx('flex items-center gap-1', collapsed && 'justify-center')}>
           <button
+            onClick={() => navigate('/settings/appearance')}
             className={clsx(
               'flex-1 p-2 rounded-lg transition-colors',
               'hover:bg-surface-hover dark:hover:bg-dark-surface-hover',
@@ -196,6 +186,7 @@ function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => 
             <Layers size={18} aria-hidden="true" />
           </button>
           <button
+            onClick={() => navigate('/settings')}
             className={clsx(
               'flex-1 p-2 rounded-lg transition-colors',
               'hover:bg-surface-hover dark:hover:bg-dark-surface-hover',
@@ -240,6 +231,7 @@ import { MessageSquare } from 'lucide-react'
 
 function Header() {
   const { t } = useTranslation()
+  const [, setTheme] = useTheme()
   
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-9 bg-surface/80 dark:bg-dark-surface/80 backdrop-blur-sm border-b border-border dark:border-dark-border flex items-center justify-between px-4 -webkit-app-region: drag">
@@ -249,7 +241,7 @@ function Header() {
       </div>
       <div className="flex items-center gap-2 -webkit-app-region: no-drag">
         {/* Theme toggle would go here */}
-        <button className="p-1.5 rounded-lg hover:bg-surface-hover dark:hover:bg-dark-surface-hover text-text-muted hover:text-text-primary dark:hover:text-dark-text-primary transition-colors" aria-label="Theme">
+        <button onClick={() => setTheme(document.documentElement.classList.contains('dark') ? 'light' : 'dark')} className="p-1.5 rounded-lg hover:bg-surface-hover dark:hover:bg-dark-surface-hover text-text-muted hover:text-text-primary dark:hover:text-dark-text-muted transition-colors" aria-label={t('settings.theme')}>
           <Monitor size={18} aria-hidden="true" />
         </button>
       </div>
@@ -272,7 +264,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         style={{ minHeight: 'calc(100vh - 36px)' }}
       >
         <div className="p-4 md:p-6 lg:p-8">
-          <Outlet />
+          {children}
         </div>
       </main>
     </div>

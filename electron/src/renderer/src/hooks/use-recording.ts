@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 export interface UseRecordingOptions {
@@ -7,176 +8,112 @@ export interface UseRecordingOptions {
 }
 
 export function useRecording({ onRecorded, maxDuration = 60 }: UseRecordingOptions) {
+  const { t } = useTranslation()
   const [isRecording, setIsRecording] = useState(false)
   const [isStarting, setIsStarting] = useState(false)
-  const [isCleaning, setIsCleaning] = useState(false)
   const [seconds, setSeconds] = useState(0)
   const [level, setLevel] = useState(0)
   const [inputs, setInputs] = useState<MediaDeviceInfo[]>([])
-  const [selectedInputId, setSelectedInputId] = useState<string>('default')
+  const [selectedInputId, setSelectedInputId] = useState('default')
   const [channelMode, setChannelMode] = useState<'auto' | 'mono' | 'stereo'>('auto')
-  
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
+  const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const contextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
-  const animationRef = useRef<number>()
+  const animationRef = useRef<number | null>(null)
+  const startingRef = useRef(false)
+  const mountedRef = useRef(true)
+  const generationRef = useRef(0)
+  const callbackRef = useRef(onRecorded)
+  callbackRef.current = onRecorded
 
-  // Enumerate inputs
+  const stop = useCallback(() => {
+    if (startingRef.current && !recorderRef.current) generationRef.current++
+    startingRef.current = false
+    const recorder = recorderRef.current
+    recorderRef.current = null
+    if (recorder && recorder.state !== 'inactive') recorder.stop()
+    streamRef.current?.getTracks().forEach(track => track.stop())
+    streamRef.current = null
+    if (animationRef.current !== null) cancelAnimationFrame(animationRef.current)
+    animationRef.current = null
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = null
+    if (contextRef.current && contextRef.current.state !== 'closed') void contextRef.current.close()
+    contextRef.current = null
+    analyserRef.current = null
+    if (mountedRef.current) { setIsRecording(false); setIsStarting(false); setLevel(0) }
+  }, [])
+
   useEffect(() => {
-    const enumerate = async () => {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices()
-        const audioInputs = devices.filter(d => d.kind === 'audioinput')
-        setInputs(audioInputs)
-        if (audioInputs.length > 0 && selectedInputId === 'default') {
-          setSelectedInputId(audioInputs[0].deviceId)
-        }
-      } catch (e) {
-        console.error('Failed to enumerate devices:', e)
-      }
-    }
-    enumerate()
-  }, [selectedInputId])
+    mountedRef.current = true
+    navigator.mediaDevices?.enumerateDevices().then(devices => {
+      if (mountedRef.current) setInputs(devices.filter(device => device.kind === 'audioinput'))
+    }).catch(() => {})
+    return () => { mountedRef.current = false; generationRef.current++; stop() }
+  }, [stop])
 
-  // Level monitoring
-  const updateLevel = useCallback(() => {
-    if (!analyserRef.current) return
-    const data = new Uint8Array(analyserRef.current.frequencyBinCount)
-    analyserRef.current.getByteFrequencyData(data)
-    const avg = data.reduce((a, b) => a + b, 0) / data.length
-    setLevel(avg / 255)
-    animationRef.current = requestAnimationFrame(updateLevel)
+  const updateLevel = useCallback(function readLevel() {
+    const analyser = analyserRef.current
+    if (!analyser || !mountedRef.current) return
+    const data = new Uint8Array(analyser.frequencyBinCount)
+    analyser.getByteFrequencyData(data)
+    setLevel(data.reduce((sum, value) => sum + value, 0) / Math.max(1, data.length) / 255)
+    animationRef.current = requestAnimationFrame(readLevel)
   }, [])
 
   const start = useCallback(async () => {
-    if (isRecording || isStarting) return
-    
-    setIsStarting(true)
-    setIsCleaning(false)
-    
+    if (startingRef.current || recorderRef.current) return
+    startingRef.current = true
+    const generation = ++generationRef.current
+    setIsStarting(true); setSeconds(0)
     try {
-      const constraints: MediaStreamConstraints = {
-        audio: {
-          deviceId: selectedInputId === 'default' ? undefined : { exact: selectedInputId },
-          channelCount: channelMode === 'mono' ? 1 : channelMode === 'stereo' ? 2 : undefined,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: {
+        deviceId: selectedInputId === 'default' ? undefined : { exact: selectedInputId },
+        channelCount: channelMode === 'mono' ? 1 : channelMode === 'stereo' ? 2 : undefined,
+        echoCancellation: true, noiseSuppression: true, autoGainControl: true,
+      } })
+      if (!mountedRef.current || generationRef.current !== generation) {
+        stream.getTracks().forEach(track => track.stop())
+        return
       }
-      
-      const stream = await navigator.mediaDevices.getUserMedia(constraints)
       streamRef.current = stream
-      
-      // Set up level monitoring
-      const audioContext = new AudioContext()
-      audioContextRef.current = audioContext
-      const source = audioContext.createMediaStreamSource(stream)
-      const analyser = audioContext.createAnalyser()
+      const context = new AudioContext()
+      contextRef.current = context
+      const analyser = context.createAnalyser()
       analyser.fftSize = 256
       analyserRef.current = analyser
-      source.connect(analyser)
-      updateLevel()
-      
-      // Determine MIME type
-      let mimeType = 'audio/webm;codecs=opus'
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'audio/webm'
-      }
-      if (!MediaRecorder.isTypeSupported(mimeType)) {
-        mimeType = 'audio/mp4'
-      }
-      
-      const recorder = new MediaRecorder(stream, { mimeType })
-      mediaRecorderRef.current = recorder
-      chunksRef.current = []
-      
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data)
-      }
-      
+      context.createMediaStreamSource(stream).connect(analyser)
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find(type => MediaRecorder.isTypeSupported(type))
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+      recorderRef.current = recorder
+      const chunks: Blob[] = []
+      recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data) }
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType })
-        const file = new File([blob], `recording-${Date.now()}.webm`, { type: mimeType })
-        onRecorded(file)
+        if (!mountedRef.current || generationRef.current !== generation || !chunks.length) return
+        const type = recorder.mimeType || mimeType || 'audio/webm'
+        const extension = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm'
+        callbackRef.current(new File(chunks, `recording-${Date.now()}.${extension}`, { type }))
       }
-      
-      recorder.start(100) // Collect data every 100ms
-      setIsRecording(true)
-      setIsStarting(false)
-      setSeconds(0)
-      
-      // Duration timer
-      intervalRef.current = setInterval(() => {
-        setSeconds(s => {
-          const next = s + 1
-          if (maxDuration && next >= maxDuration) {
-            stop()
-          }
-          return next
-        })
+      recorder.onerror = () => { stop(); toast.error(t('recording.failed')) }
+      recorder.start(100)
+      startingRef.current = false
+      setIsRecording(true); setIsStarting(false)
+      updateLevel()
+      let elapsed = 0
+      timerRef.current = setInterval(() => {
+        elapsed++
+        setSeconds(elapsed)
+        if (maxDuration > 0 && elapsed >= maxDuration) stop()
       }, 1000)
-      
-    } catch (error) {
-      console.error('Recording failed:', error)
-      toast.error('Failed to start recording')
-      setIsStarting(false)
-    }
-  }, [selectedInputId, channelMode, maxDuration, onRecorded, updateLevel])
-
-  const stop = useCallback(() => {
-    if (!isRecording) return
-    
-    mediaRecorderRef.current?.stop()
-    streamRef.current?.getTracks().forEach(t => t.stop())
-    
-    if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current)
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
-    }
-    audioContextRef.current?.close()
-    
-    setIsRecording(false)
-    setSeconds(0)
-    setLevel(0)
-  }, [isRecording])
-
-  const cleanup = useCallback(() => {
-    stop()
-    setIsCleaning(true)
-    // Additional cleanup if needed
-    setTimeout(() => setIsCleaning(false), 500)
-  }, [stop])
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
+    } catch {
+      const report = mountedRef.current && generationRef.current === generation
       stop()
-      if (animationRef.current) cancelAnimationFrame(animationRef.current)
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      audioContextRef.current?.close()
+      if (report) toast.error(t('recording.failed'))
     }
-  }, [stop])
+  }, [selectedInputId, channelMode, maxDuration, stop, updateLevel, t])
 
-  return {
-    isRecording,
-    isStarting,
-    isCleaning,
-    seconds,
-    level,
-    inputs,
-    selectedInputId,
-    setSelectedInputId,
-    channelMode,
-    setChannelMode,
-    start,
-    stop,
-    cleanup,
-  }
+  return { isRecording, isStarting, isCleaning: false, seconds, level, inputs, selectedInputId,
+    setSelectedInputId, channelMode, setChannelMode, start, stop, cleanup: stop }
 }

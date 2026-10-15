@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { queryClient, queryKeys } from '../lib/api/query'
-import { listProfiles, createProfile, deleteProfile, type Profile, type CreateProfileInput } from '../lib/api/profiles'
+import { queryKeys } from '../lib/api/query'
+import { listProfiles, createProfile, deleteProfile } from '../lib/api/profiles'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 

@@ -1,35 +1,47 @@
+import tempfile
 import unittest
-from src.data import TTSDataset
-import os
-import shutil
+from pathlib import Path
+
 import numpy as np
 import soundfile as sf
 
-from conftest import requires_ffmpeg
+from src.data import TTSDataset
+from src.text_processor import TextProcessor
+from conftest import requires_espeak
+
 
 class TestTTSDataset(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        os.makedirs('tests/tmp', exist_ok=True)
-        # Create dummy wav and txt
-        audio = np.random.randn(22050)
-        sf.write('tests/tmp/0.wav', audio, 22050)
-        with open('tests/tmp/0.txt', 'w') as f:
-            f.write('hello world')
-
-    @classmethod
-    def tearDownClass(cls):
-        shutil.rmtree('tests/tmp')
-
-    @requires_ffmpeg
+    @requires_espeak
     def test_dataset(self):
-        # __getitem__ returns a dict (text_tokens/spectrogram/wav/...), not
-        # the (audio, text) tuple this test used to unpack -- that API
-        # predates collate_fn's dict-based batching and no longer exists.
-        ds = TTSDataset('tests/tmp', sample_rate=22050)
-        item = ds[0]
-        self.assertEqual(item['text_tokens'].shape[0], len('hello world'))
-        self.assertEqual(item['wav'].shape[0], 22050)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            audio = np.random.default_rng(42).normal(0, 0.1, 22050)
+            sf.write(root / '0.wav', audio, 22050)
+            (root / '0.txt').write_text('hello world', encoding='utf-8')
+            processor = TextProcessor(language='en')
+            expected = processor.phonemes_to_ids(processor.text_to_phonemes('hello world'))
+            item = TTSDataset(directory, sample_rate=22050, text_processor=processor)[0]
+            self.assertEqual(item['text_tokens'].tolist(), expected)
+            self.assertEqual(item['wav'].shape[0], 22050)
+
+    def test_stereo_wav_is_averaged_and_resampled_without_ffmpeg(self):
+        from unittest.mock import Mock
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            left = np.full(16000, 0.2, dtype=np.float32)
+            sf.write(root / 'stereo.wav', np.column_stack((left, -left)), 16000, subtype='FLOAT')
+            (root / 'stereo.txt').write_text('audio', encoding='utf-8')
+            processor = Mock()
+            processor.text_to_phonemes.return_value = 'a'
+            processor.phonemes_to_ids.return_value = [1]
+            item = TTSDataset(directory, sample_rate=22050, text_processor=processor)[0]
+            self.assertEqual(item['wav'].shape[0], 22050)
+            self.assertEqual(item['wav'].abs().max().item(), 0)
+            self.assertTrue(np.isfinite(item['spectrogram'].numpy()).all())
+            (root / 'stereo.wav').write_bytes(b'not audio')
+            with self.assertRaises(sf.LibsndfileError):
+                TTSDataset(directory, text_processor=processor)[0]
+
 
 if __name__ == '__main__':
     unittest.main()

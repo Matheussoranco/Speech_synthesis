@@ -57,10 +57,11 @@ eval = [
     "joblib>=1.2.0",
 ]
 ml = [
-    "transformers>=4.30.0",
+    "transformers>=4.57.0,<5.0",
 ]
 tts = [
-    "coqui-tts>=0.22.0",
+    "coqui-tts>=0.27.5,<0.28",
+    "transformers>=4.57.0,<5.0",
 ]
 nlp = [
     "spacy>=3.0.0",
@@ -100,11 +101,11 @@ include = ["src*"]
 
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py310']
 include = '\.pyi?$'
 
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     port: int = 3900
     
     # CORS
-    cors_origins: List[str] = ["http://localhost:3902", "app://voicestudio"]
+    cors_origins: List[str] = ["http://localhost:3901", "http://localhost:3902", "voicestudio://voicestudio"]
     
     # Paths
     data_dir: Path = Path("./data")
@@ -51,11 +51,14 @@ class Settings(BaseSettings):
     
     # Auth
     remote_api_key: Optional[str] = None
-    session_ttl_seconds: int = 3600
+    # Non-loopback Host names accepted (e.g. a LAN IP); these always require remote_api_key.
+    allowed_hosts: List[str] = []
+    session_ttl_seconds: int = Field(default=3600, gt=0)
     
     # Limits
     max_text_length: int = 5000
     max_audio_duration: int = 300  # seconds
+    max_profile_upload_bytes: int = Field(default=64 * 1024 * 1024, gt=0)
     clone_max_seconds: int = 15
     ref_hard_max_seconds: int = 75
     

@@ -40,6 +40,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from core.config import settings
+from core.csrf import request_guard
 from api.routers import (
     system,
     generate,
@@ -87,6 +88,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Registered after CORS so it runs first (outermost).
+app.middleware("http")(request_guard)
 
 # Static files for generated audio
 audio_dir = Path(settings.audio_output_dir)

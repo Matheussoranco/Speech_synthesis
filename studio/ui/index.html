@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Estúdio de Voz</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="top">
+    <h1>Estúdio de Voz</h1>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="speak" aria-selected="true">Falar</button>
+      <button role="tab" data-tab="voices">Vozes</button>
+      <button role="tab" data-tab="transcribe">Transcrever</button>
+      <button role="tab" data-tab="dub">Dublar</button>
+      <button role="tab" data-tab="history">Histórico</button>
+    </nav>
+    <div class="status">
+      <span id="status-text" class="muted">Conectando…</span>
+      <button id="unload" class="ghost small" title="Tira os modelos da memória da GPU">Liberar memória</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Falar -->
+    <section id="tab-speak" class="panel">
+      <div class="field">
+        <div class="row between">
+          <label for="speak-text">Texto</label>
+          <span class="row gap-s">
+            <span id="speak-count" class="muted small">0 caracteres</span>
+            <label class="ghost small file-btn">Abrir .txt<input id="speak-file" type="file" accept=".txt,.md,text/plain" hidden></label>
+          </span>
+        </div>
+        <textarea id="speak-text" rows="8" placeholder="Digite ou cole o texto. Textos longos (capítulos, livros) são divididos automaticamente."></textarea>
+      </div>
+
+      <div class="field">
+        <span class="label">Voz</span>
+        <div class="segmented" id="voice-mode">
+          <button data-mode="auto" aria-pressed="true">Automática</button>
+          <button data-mode="voice">Minhas vozes</button>
+          <button data-mode="design">Descrever</button>
+          <button data-mode="clone">Clonar de um áudio</button>
+        </div>
+        <div class="mode-box" data-for="auto"><p class="muted small">O modelo escolhe uma voz natural para o texto.</p></div>
+        <div class="mode-box" data-for="voice" hidden>
+          <select id="speak-voice"></select>
+          <p class="muted small" id="speak-voice-empty" hidden>Nenhuma voz salva ainda. Crie uma na aba Vozes.</p>
+        </div>
+        <div class="mode-box grid4" data-for="design" hidden>
+          <label>Gênero<select id="d-gender"></select></label>
+          <label>Idade<select id="d-age"></select></label>
+          <label>Tom<select id="d-pitch"></select></label>
+          <label>Sotaque (inglês)<select id="d-accent"></select></label>
+          <label class="check"><input type="checkbox" id="d-whisper"> Sussurrando</label>
+        </div>
+        <div class="mode-box" data-for="clone" hidden>
+          <div class="row gap wrap">
+            <input id="clone-file" type="file" accept="audio/*,video/*">
+            <button id="clone-rec" class="ghost">● Gravar</button>
+            <audio id="clone-preview" controls hidden></audio>
+          </div>
+          <p class="muted small">De 3 a 15 segundos de fala limpa, sem música de fundo.</p>
+          <input id="clone-text" type="text" placeholder="O que é dito na referência (opcional, é transcrito sozinho)">
+        </div>
+      </div>
+
+      <div class="row gap wrap">
+        <label class="field compact">Idioma<select id="speak-lang" class="lang-select"></select></label>
+        <label class="field compact">Velocidade <span id="speed-val">1.0×</span>
+          <input id="speak-speed" type="range" min="0.5" max="2" step="0.05" value="1"></label>
+        <label class="field compact">Formato<select id="speak-format"></select></label>
+        <details class="field compact advanced">
+          <summary>Avançado</summary>
+          <label>Qualidade (passos)<input id="speak-steps" type="number" min="8" max="64" value="32"></label>
+          <label>Semente (-1 = aleatória)<input id="speak-seed" type="number" value="-1"></label>
+        </details>
+      </div>
+
+      <div class="row gap">
+        <button id="speak-go" class="primary">Gerar áudio</button>
+        <div class="job" id="speak-job" hidden></div>
+      </div>
+      <div id="speak-result" class="result" hidden></div>
+    </section>
+
+    <!-- Vozes -->
+    <section id="tab-voices" class="panel" hidden>
+      <form id="voice-form" class="card">
+        <h2>Nova voz</h2>
+        <div class="row gap wrap">
+          <label class="field grow">Nome<input id="v-name" required maxlength="80" placeholder="Ex.: Narrador"></label>
+          <label class="field compact">Idioma<select id="v-lang" class="lang-select"></select></label>
+        </div>
+        <div class="row gap wrap">
+          <input id="v-file" type="file" accept="audio/*,video/*">
+          <button type="button" id="v-rec" class="ghost">● Gravar</button>
+          <audio id="v-preview" controls hidden></audio>
+        </div>
+        <label class="field">Transcrição (opcional)<input id="v-text" placeholder="Se deixar vazio, é transcrita automaticamente"></label>
+        <div class="row gap">
+          <button class="primary">Salvar voz</button>
+          <div class="job" id="voice-job" hidden></div>
+        </div>
+      </form>
+      <div id="voice-list" class="list"></div>
+    </section>
+
+    <!-- Transcrever -->
+    <section id="tab-transcribe" class="panel" hidden>
+      <form id="tr-form" class="card">
+        <div class="row gap wrap">
+          <input id="tr-file" type="file" accept="audio/*,video/*" required>
+          <label class="field compact">Idioma<select id="tr-lang" class="lang-select"></select></label>
+          <label class="field compact">Saída<select id="tr-task">
+            <option value="transcribe">Transcrever</option>
+            <option value="translate">Traduzir para inglês</option>
+          </select></label>
+        </div>
+        <div class="row gap">
+          <button class="primary">Transcrever</button>
+          <div class="job" id="tr-job" hidden></div>
+        </div>
+      </form>
+      <div id="tr-result" class="result" hidden></div>
+    </section>
+
+    <!-- Dublar -->
+    <section id="tab-dub" class="panel" hidden>
+      <form id="dub-form" class="card">
+        <input id="dub-file" type="file" accept="video/*,audio/*" required>
+        <div class="row gap wrap">
+          <label class="field compact">Idioma original<select id="dub-src" class="lang-select"></select></label>
+          <label class="field compact">Dublar para<select id="dub-target" class="lang-select no-auto"></select></label>
+          <label class="field compact">Voz<select id="dub-voice"></select></label>
+          <label class="field compact">Áudio original ao fundo <span id="dub-vol-val">0%</span>
+            <input id="dub-vol" type="range" min="0" max="0.5" step="0.05" value="0"></label>
+        </div>
+        <p class="muted small" id="dub-hint"></p>
+        <div class="row gap">
+          <button class="primary">Dublar</button>
+          <div class="job" id="dub-job" hidden></div>
+        </div>
+      </form>
+      <div id="dub-result" class="result" hidden></div>
+    </section>
+
+    <!-- Histórico -->
+    <section id="tab-history" class="panel" hidden>
+      <div id="history-list" class="list"></div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

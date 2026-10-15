@@ -25,7 +25,7 @@ export class ApiError extends Error {
     let detail = response.statusText
     
     try {
-      const data = await response.json()
+      const data = await response.clone().json()
       payload = data
       detail = data.detail || data.message || response.statusText
     } catch {
@@ -36,15 +36,14 @@ export class ApiError extends Error {
   }
 }
 
-async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+export async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const url = `${API_BASE}${path}`
+  const headers = new Headers(init.headers)
+  if (!(init.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   
   const response = await fetch(url, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...init.headers,
-    },
+    headers,
     credentials: 'include',
   })
   
@@ -76,14 +75,13 @@ export function profileAudioUrl(profileId: string): string {
 
 // Helper for multipart/form-data
 export async function apiFormData<T>(path: string, formData: FormData, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers)
+  headers.delete('Content-Type')
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
     method: init.method || 'POST',
     body: formData,
-    headers: {
-      ...init.headers,
-      // Don't set Content-Type for FormData - browser sets it with boundary
-    },
+    headers,
     credentials: 'include',
   })
   

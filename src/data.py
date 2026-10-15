@@ -192,10 +192,12 @@ class TTSDataset(Dataset):
         text_tokens = torch.LongTensor(ids)
 
         # Load audio
-        wav, sr = torchaudio.load(sample["wav"])
-        if wav.shape[0] > 1:
-            wav = wav.mean(0, keepdim=True)
-        wav = wav.squeeze(0)
+        # Dataset formats are WAV. Use the declared libsndfile dependency
+        # directly; decoding must not require an undeclared TorchCodec/FFmpeg DLL.
+        audio, sr = sf.read(sample["wav"], dtype="float32", always_2d=True)
+        if not len(audio) or not np.isfinite(audio).all():
+            raise ValueError(f"empty or non-finite audio (wav={sample['wav']!r})")
+        wav = torch.from_numpy(audio.mean(axis=1))
         if sr != self.sample_rate:
             wav = torchaudio.functional.resample(wav, sr, self.sample_rate)
 

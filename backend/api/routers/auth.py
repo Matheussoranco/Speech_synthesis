@@ -1,6 +1,6 @@
-"
+"""
 Authentication for remote administration
-"
+"""
 
 from fastapi import APIRouter, HTTPException, Request, Response, Depends
 from pydantic import BaseModel
@@ -18,7 +18,9 @@ from core.auth import (
     master_header_valid,
     principal_for,
     remote_api_key,
+    sessions,
 )
+from core.csrf import cookie_csrf_allowed
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -31,7 +33,6 @@ class SessionResponse(BaseModel):
     expires_in: int
 
 # Simple in-memory session store
-sessions = {}
 SESSION_TTL = settings.session_ttl_seconds
 
 @router.post("/session", response_model=SessionResponse)
@@ -48,6 +49,8 @@ async def create_session(payload: SessionRequest, request: Request, response: Re
         if not header_ok:
             raise HTTPException(401, "Invalid API key")
     elif legacy_ok:
+        if not cookie_csrf_allowed(request):
+            raise HTTPException(403, "Untrusted cookie origin")
         if payload.transport != "cookie":
             raise HTTPException(403, "Cookie transport required for legacy migration")
     else:
@@ -75,16 +78,28 @@ async def create_session(payload: SessionRequest, request: Request, response: Re
     # Clear legacy cookie
     response.delete_cookie("ov_key", path="/", secure=request.url.scheme == "https", httponly=True, samesite="strict")
     
-    return Response(status_code=204)
+    response.status_code = 204
+    return response
 
 @router.delete("/session", status_code=204)
 async def delete_session(request: Request, response: Response):
     principal = principal_for(request)
+    if authorization_credential_present(request) and principal.kind == PrincipalKind.ANONYMOUS:
+        raise HTTPException(401, "Invalid authorization credential")
+    if principal.transport == CredentialTransport.COOKIE and not cookie_csrf_allowed(request):
+        raise HTTPException(403, "Untrusted cookie origin")
     if principal.kind == PrincipalKind.ADMIN_SESSION:
         sessions.pop(principal.credential_id, None)
+    # Clear and revoke the presented browser session even when a master or
+    # legacy credential took precedence over it during principal resolution.
+    browser_token = request.cookies.get("ov_session")
+    if browser_token and principal.kind != PrincipalKind.ANONYMOUS:
+        sessions.pop(browser_token, None)
     
     response.delete_cookie("ov_session", path="/", secure=request.url.scheme == "https", httponly=True, samesite="strict")
-    return Response(status_code=204)
+    response.delete_cookie("ov_key", path="/", secure=request.url.scheme == "https", httponly=True, samesite="strict")
+    response.status_code = 204
+    return response
 
 @router.get("/session")
 async def get_session(request: Request):

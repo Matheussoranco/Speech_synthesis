@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   Mic, 
@@ -7,25 +7,20 @@ import {
   Play, 
   Pause, 
   Download, 
-  Copy, 
-  Check, 
-  AlertCircle,
   Info,
   SlidersHorizontal,
   FolderOpen,
   RotateCcw,
   Trash2,
-  Star,
-  Volume2,
-  VolumeX,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useGenerateClone } from '../../hooks/use-generate'
 import { useRecording } from '../../hooks/use-recording'
-import { referenceStore, setReferenceFile, clearReference } from '../../lib/store/reference'
-import { cloneSettingsStore, useCloneSettings, patchCloneSettings, resetCloneOverrides } from '../../lib/store/clone-settings'
-import { useProfiles, useCreateProfile } from '../../hooks/use-profiles'
-import { apiJson } from '../../lib/api'
+import { useReference, setReferenceFile, clearReference } from '../../lib/store/reference'
+import { useCloneSettings, setCloneSetting, patchCloneSettings, resetCloneOverrides } from '../../lib/store/clone-settings'
+import { useProfiles, useCreateProfile, useDeleteProfile } from '../../hooks/use-profiles'
+import type { Profile } from '../../lib/api/profiles'
+import { useEngines } from '../../hooks/use-engines'
 import { clsx } from 'clsx'
 
 // Language list (bundled)
@@ -42,13 +37,16 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toFixed(1).padStart(4, '0')}`
 }
 
-function ReferenceAudio({ onChange, onClear, onRecord }: { 
+function ReferenceAudio({ onChange, onClear, onRecord, isRecording, isStarting, seconds }: { 
   onChange: (file: File) => void
   onClear: () => void
   onRecord: () => void
+  isRecording: boolean
+  isStarting: boolean
+  seconds: number
 }) {
   const { t } = useTranslation()
-  const { file, duration_seconds, object_url } = referenceStore.useStore()
+  const { file, duration_seconds, object_url } = useReference()
   const [dragActive, setDragActive] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   
@@ -145,10 +143,11 @@ function ReferenceAudio({ onChange, onClear, onRecord }: {
           <button
             type="button"
             onClick={onRecord}
+            disabled={isStarting}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary-hover transition-colors flex items-center gap-2"
           >
             <Mic size={18} aria-hidden="true" />
-            {t('clone.record')}
+            {isRecording ? `${t('recording.stop')} (${seconds}s)` : t('clone.record')}
           </button>
         </div>
       </label>
@@ -156,11 +155,13 @@ function ReferenceAudio({ onChange, onClear, onRecord }: {
   )
 }
 
-function SavedVoicesPanel({ onSelect }: { onSelect: (profile: any) => void }) {
+export function SavedVoicesPanel({ onSelect }: { onSelect: (profile: Profile) => void }) {
   const { t } = useTranslation()
   const { data: profiles, isLoading } = useProfiles()
-  const { selected_profile_id } = useCloneSettings()
+  const { selected_profile_id, language, instruct } = useCloneSettings()
+  const { file } = useReference()
   const createProfile = useCreateProfile()
+  const deleteProfile = useDeleteProfile()
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newRefText, setNewRefText] = useState('')
@@ -173,6 +174,7 @@ function SavedVoicesPanel({ onSelect }: { onSelect: (profile: any) => void }) {
     return (
       <div className="space-y-3 p-3 bg-surface-hover dark:bg-dark-surface-hover rounded-lg border border-border dark:border-dark-border">
         <h4 className="font-medium">{t('profiles.createNew')}</h4>
+        {!file && <p role="status">{t('profiles.referenceRequired')}</p>}
         <input
           type="text"
           value={newName}
@@ -196,14 +198,18 @@ function SavedVoicesPanel({ onSelect }: { onSelect: (profile: any) => void }) {
           </button>
           <button
             onClick={async () => {
-              // Note: This would need the reference audio file from the reference store
-              // For now just close
-              setShowCreate(false)
-              setNewName('')
-              setNewRefText('')
+              if (!file) return
+              try {
+                const profile = await createProfile.mutateAsync({ name: newName.trim(), ref_audio: file,
+                  ref_audio_name: file.name, ref_text: newRefText, instruct, language })
+                onSelect(profile)
+                setShowCreate(false)
+                setNewName('')
+                setNewRefText('')
+              } catch { /* The mutation displays the server error and preserves the form. */ }
             }}
             className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary-hover"
-            disabled={!newName.trim()}
+            disabled={!newName.trim() || !newRefText.trim() || !file || createProfile.isPending}
           >
             {t('common.create')}
           </button>
@@ -231,9 +237,8 @@ function SavedVoicesPanel({ onSelect }: { onSelect: (profile: any) => void }) {
       ) : (
         <div className="space-y-2 max-h-60 overflow-y-auto thin-scrollbar">
           {profiles.map(profile => (
-            <button
+            <div
               key={profile.id}
-              onClick={() => onSelect(profile)}
               className={clsx(
                 'w-full p-3 rounded-lg border transition-colors text-left flex items-center gap-3',
                 selected_profile_id === profile.id
@@ -241,6 +246,7 @@ function SavedVoicesPanel({ onSelect }: { onSelect: (profile: any) => void }) {
                   : 'border-border dark:border-dark-border hover:bg-surface-hover dark:hover:bg-dark-surface-hover'
               )}
             >
+              <button onClick={() => onSelect(profile)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
               <div className="w-10 h-10 rounded-lg bg-primary/10 dark:bg-primary/20 flex items-center justify-center flex-shrink-0">
                 <Mic size={18} className="text-primary" aria-hidden="true" />
               </div>
@@ -248,14 +254,18 @@ function SavedVoicesPanel({ onSelect }: { onSelect: (profile: any) => void }) {
                 <p className="font-medium truncate">{profile.name}</p>
                 <p className="text-xs text-text-muted dark:text-dark-text-muted truncate">{profile.language}</p>
               </div>
+              </button>
               <button
-                onClick={e => { e.stopPropagation(); /* delete */ }}
+                onClick={() => deleteProfile.mutate(profile.id, { onSuccess: () => {
+                  if (selected_profile_id === profile.id) setCloneSetting('selected_profile_id', null)
+                } })}
+                disabled={deleteProfile.isPending}
                 className="p-1 text-text-muted hover:text-error transition-colors"
                 aria-label={t('profiles.delete')}
               >
                 <Trash2 size={16} aria-hidden="true" />
               </button>
-            </button>
+            </div>
           ))}
         </div>
       )}
@@ -264,15 +274,15 @@ function SavedVoicesPanel({ onSelect }: { onSelect: (profile: any) => void }) {
 }
 
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
-import { useCloneSettings } from '../../lib/store/clone-settings'
 
 function Composer() {
   const { t } = useTranslation()
+  const { data: engines } = useEngines()
+  const cloningAvailable = engines.tts.some(engine => engine.status === 'available' && engine.capabilities.includes('voice_cloning'))
   const { isGenerating, progress, elapsedSeconds, generate, cancel } = useGenerateClone()
   const { 
     speed, cfg, steps, t_shift, pos_temp, class_temp, layer_penalty, 
-    denoise, postprocess, duration, show_overrides, setCloneSetting 
+    denoise, postprocess, duration 
   } = useCloneSettings()
   const { auto_play } = useCloneSettings()
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -406,8 +416,8 @@ function Composer() {
       {/* Generate button */}
       <button
         type="button"
-        onClick={isGenerating ? cancel : generate}
-        disabled={isGenerating && progress === null}
+        onClick={() => { if (isGenerating) cancel(); else void generate().catch(() => {}) }}
+        disabled={!isGenerating && !cloningAvailable}
         className={clsx(
           'w-full py-3 rounded-lg font-semibold text-lg flex items-center justify-center gap-2 transition-colors',
           isGenerating
@@ -427,6 +437,7 @@ function Composer() {
           </>
         )}
       </button>
+      {!cloningAvailable && <p role="status" className="text-sm text-text-muted">{t('clone.modelUnavailable')}</p>}
       
       {isGenerating && progress !== null && (
         <div className="h-1 bg-border dark:bg-dark-border rounded-full overflow-hidden">
@@ -448,11 +459,10 @@ function Composer() {
 }
 
 import { Loader2 } from 'lucide-react'
-import { useCloneSettings } from '../../lib/store/clone-settings'
 
 function OutputPlayer() {
   const { t } = useTranslation()
-  const { result, object_url, text } = useLatestOutput()
+  const { result, text } = useLatestOutput()
   const [playing, setPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement>(null)
   
@@ -513,11 +523,14 @@ import { useLatestOutput } from '../../lib/store/output'
 
 export default function CloneWorkspace() {
   const { t } = useTranslation()
-  const { text, setCloneSetting: setText, selected_profile_id, setCloneSetting: setProfile } = useCloneSettings()
-  const reference = referenceStore.useStore()
+  const { text } = useCloneSettings()
+  const setText = setCloneSetting
+  const setProfile = setCloneSetting
+
   
   const handleReferenceChange = useCallback(async (file: File) => {
     const result = await setReferenceFile(file)
+    if (result.cancelled) return
     if (!result.ok) {
       toast.error(t('clone.invalidAudio'))
       return
@@ -533,14 +546,17 @@ export default function CloneWorkspace() {
     clearReference()
   }, [])
   
-  const handleProfileSelect = useCallback((profile: any) => {
-    setProfile('selected_profile_id', profile.id)
-    // Would also load ref_text, instruct, language from profile
+  const handleProfileSelect = useCallback((profile: Profile) => {
+    clearReference()
+    patchCloneSettings({ selected_profile_id: profile.id, ref_text: profile.ref_text,
+      instruct: profile.instruct, language: profile.language })
   }, [setProfile])
   
+  const recording = useRecording({ onRecorded: handleReferenceChange, maxDuration: 75 })
   const handleRecord = useCallback(() => {
-    // Recording is handled by the recording hook in the reference component
-  }, [])
+    if (recording.isRecording) recording.stop()
+    else void recording.start()
+  }, [recording.isRecording, recording.stop, recording.start])
   
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -584,6 +600,9 @@ export default function CloneWorkspace() {
               onChange={handleReferenceChange}
               onClear={handleReferenceClear}
               onRecord={handleRecord}
+              isRecording={recording.isRecording}
+              isStarting={recording.isStarting}
+              seconds={recording.seconds}
             />
             
             <SavedVoicesPanel onSelect={handleProfileSelect} />

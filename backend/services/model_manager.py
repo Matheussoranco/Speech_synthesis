@@ -1,6 +1,6 @@
-"
+"""
 Model management service - handles loading/unloading models
-"
+"""
 
 import asyncio
 import logging
@@ -28,11 +28,7 @@ def get_model(engine_id: str):
     if engine_id in _model_cache:
         return _model_cache[engine_id]
     
-    # In production, load the actual model
-    logger.info(f"Loading model: {engine_id}")
-    model = {"id": engine_id, "loaded": True}
-    _model_cache[engine_id] = model
-    return model
+    raise RuntimeError(f"No model adapter is configured for {engine_id}")
 
 def unload_model(engine_id: str) -> bool:
     """Unload a model"""

@@ -1,5 +1,13 @@
 # VITS2 Neural TTS + Voice Cloning
 
+> The legacy VITS2 package below is separate from the independent VoiceStudio
+> desktop backend in `backend/`. The desktop now supports real standard speech
+> through installed Windows voices; it does not yet provide cloning, voice
+> design, transcription, dubbing or audiobook model adapters. Unavailable
+> operations return explicit errors. Profile/history metadata is session-only;
+> export it before restarting. See [desktop contracts](electron/CONTRACT.md) for
+> actual setup requirements, packaging checks and current limitations.
+
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

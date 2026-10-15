@@ -1,4 +1,4 @@
-import { createStore } from '@tanstack/store'
+import { createStore, useStore } from 'zustand'
 import type { GenerateResult } from '../api/generate'
 
 export interface OutputState {
@@ -7,14 +7,14 @@ export interface OutputState {
   text: string
 }
 
-const outputStore = createStore<OutputState>()({
+const outputStore = createStore<OutputState>(() => ({
   result: null,
   object_url: null,
   text: '',
-})
+}))
 
 export function useLatestOutput() {
-  return outputStore.useStore()
+  return useStore(outputStore)
 }
 
 export function setLatestOutput(result: GenerateResult, text: string) {
@@ -24,11 +24,7 @@ export function setLatestOutput(result: GenerateResult, text: string) {
     URL.revokeObjectURL(prev.object_url)
   }
   
-  const object_url = URL.createObjectURL(new Blob([], { type: 'audio/wav' }))
-  // We'll update the object_url when the actual audio blob is available
-  // For now, the audio component will fetch from the path
-  
-  outputStore.setState({ result, object_url, text })
+  outputStore.setState({ result, object_url: null, text })
 }
 
 export function clearOutput() {

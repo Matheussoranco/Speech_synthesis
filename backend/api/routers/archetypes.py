@@ -1,6 +1,6 @@
-"
+"""
 Voice archetypes
-"
+"""
 
 from fastapi import APIRouter
 

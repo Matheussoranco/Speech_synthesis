@@ -30,8 +30,7 @@ export async function deleteHistoryItem(id: string): Promise<void> {
 }
 
 export async function setHistoryStarred(id: string, starred: boolean): Promise<HistoryItem> {
-  return apiJson<HistoryItem>(`/history/${encodeURIComponent(id)}/star`, {
+  return apiJson<HistoryItem>(`/history/${encodeURIComponent(id)}/star?starred=${starred}`, {
     method: 'PATCH',
-    body: JSON.stringify({ starred }),
   })
 }

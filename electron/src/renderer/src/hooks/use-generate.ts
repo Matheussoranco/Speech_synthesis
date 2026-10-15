@@ -1,10 +1,11 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { generateClone, type CloneGenerateInput, type GenerateResult } from '../lib/api/generate'
-import { useLatestOutput } from '../lib/store/output'
+import { ApiError } from '../lib/api/client'
+import { generateClone, type CloneGenerateInput } from '../lib/api/generate'
+import { setLatestOutput } from '../lib/store/output'
 import { useCloneSettings } from '../lib/store/clone-settings'
-import { referenceStore } from '../lib/store/reference'
+import { useReference } from '../lib/store/reference'
 import { queryClient } from '../lib/api/query'
 import { queryKeys } from '../lib/api/query'
 
@@ -15,9 +16,14 @@ export function useGenerateClone() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const abortRef = useRef<AbortController | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const { setLatestOutput } = useLatestOutput()
   const cloneSettings = useCloneSettings()
-  const reference = referenceStore.useStore()
+  const reference = useReference()
+  useEffect(() => () => {
+    abortRef.current?.abort()
+    abortRef.current = null
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    intervalRef.current = null
+  }, [])
 
   const cancel = useCallback(() => {
     if (abortRef.current) {
@@ -34,6 +40,7 @@ export function useGenerateClone() {
   }, [])
 
   const generate = useCallback(async () => {
+    if (abortRef.current) return
     const { text, language, selected_profile_id } = cloneSettings
     const { file: ref_file, duration_seconds: ref_duration } = reference
     
@@ -76,27 +83,28 @@ export function useGenerateClone() {
 
     // Start generation
     setIsGenerating(true)
-    setProgress(0)
+    setProgress(null)
     setElapsedSeconds(0)
     
-    abortRef.current = new AbortController()
+    const controller = new AbortController()
+    abortRef.current = controller
     const startTime = Date.now()
     
     // Progress timer
     intervalRef.current = setInterval(() => {
       setElapsedSeconds((Date.now() - startTime) / 1000)
-      // Fake progress for better UX
-      setProgress(p => p === null ? 10 : Math.min(90, (p || 0) + Math.random() * 10))
+      // The elapsed timer is factual; progress stays indeterminate until reported.
     }, 500)
 
     try {
       const result = await generateClone(input, {
-        signal: abortRef.current.signal,
+        signal: controller.signal,
         onProgress: (pct) => {
-          if (pct !== null) setProgress(pct)
+          if (pct !== null && abortRef.current === controller) setProgress(pct)
         },
       })
 
+      if (controller.signal.aborted || abortRef.current !== controller) return
       // Success
       setProgress(100)
       setLatestOutput(result, text)
@@ -116,10 +124,11 @@ export function useGenerateClone() {
       
       return result
     } catch (error: unknown) {
+      if (abortRef.current !== controller) return
       if (error instanceof Error && error.name === 'AbortError') {
         toast.info(t('generate.cancelled'))
-      } else if (error instanceof Error && 'status' in error) {
-        const apiError = error as { status: number; detail: string }
+      } else if (error instanceof ApiError) {
+        const apiError = error
         if (apiError.status === 422 && apiError.detail.includes('similarity')) {
           toast.error(t('generate.errors.lowSimilarity'))
         } else {
@@ -130,6 +139,7 @@ export function useGenerateClone() {
       }
       throw error
     } finally {
+      if (abortRef.current === controller) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
         intervalRef.current = null
@@ -138,6 +148,7 @@ export function useGenerateClone() {
       setProgress(null)
       setElapsedSeconds(0)
       abortRef.current = null
+      }
     }
   }, [cloneSettings, reference, setLatestOutput, t])
 

@@ -1,10 +1,9 @@
-"
+"""
 Secure subprocess management for contained backend
-"
+"""
 
 import os
 import sys
-import fcntl
 
 def secure_backend_drain_fd() -> None:
     """
@@ -14,10 +13,9 @@ def secure_backend_drain_fd() -> None:
     drain_fd = int(os.environ.get("VOICESTUDIO_BACKEND_DRAIN_FD", "-1"))
     if drain_fd >= 0:
         try:
-            flags = fcntl.fcntl(drain_fd, fcntl.F_GETFD)
-            fcntl.fcntl(drain_fd, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
-        except Exception:
-            pass
+            os.set_inheritable(drain_fd, False)
+        except OSError as error:
+            raise RuntimeError("Could not protect the backend drain descriptor") from error
 
 def supervisor_main(argv: list[str]) -> int:
     """

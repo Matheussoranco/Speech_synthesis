@@ -1,8 +1,8 @@
-"
+"""
 Audiobook generation
-"
+"""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter(prefix="/audiobook", tags=["audiobook"])
 
@@ -12,12 +12,12 @@ async def list_audiobook_projects():
 
 @router.post("/projects")
 async def create_audiobook_project():
-    return {"id": "new-project"}
+    raise HTTPException(503, "Audiobook project storage is not implemented")
 
 @router.get("/projects/{project_id}")
 async def get_audiobook_project(project_id: str):
-    return {"id": project_id}
+    raise HTTPException(404, "Audiobook project not found")
 
 @router.post("/projects/{project_id}/generate")
 async def generate_audiobook(project_id: str):
-    return {"status": "started"}
+    raise HTTPException(503, "No real audiobook pipeline is configured")
