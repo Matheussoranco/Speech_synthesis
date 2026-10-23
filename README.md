@@ -11,6 +11,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![PyTorch 2.0+](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![XERJ Corpus Hub contributor](https://hub.xerj.org/contributors/Matheussoranco/badge.svg)](https://hub.xerj.org/contributors/Matheussoranco)
 
 State-of-the-art end-to-end text-to-speech system implementing **VITS2** with
 **ECAPA-TDNN** zero-shot voice cloning. Synthesises natural 22 kHz speech from
